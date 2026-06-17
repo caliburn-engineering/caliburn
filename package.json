@@ -1,0 +1,22 @@
+{
+  "name": "caliburn",
+  "version": "0.1.0",
+  "description": "Engineering AI workspace — RAG pipeline and tooling",
+  "type": "module",
+  "scripts": {
+    "ingest": "tsx tools/rag/ingest.ts",
+    "ingest:dry": "tsx tools/rag/ingest.ts --dry-run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@earendil-works/pi-coding-agent": "^0.79.4",
+    "gray-matter": "^4.0.3",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pdf-parse": "^1.1.4",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

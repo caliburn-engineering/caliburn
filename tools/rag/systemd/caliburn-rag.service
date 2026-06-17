@@ -1,0 +1,15 @@
+[Unit]
+Description=Caliburn RAG Pipeline — nightly knowledge ingestion
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/nds/Desktop/Merlin/04-projects/Caliburn
+ExecStart=/home/nds/.local/share/mise/shims/npm run ingest
+Environment=HOME=/home/nds
+Environment=PATH=/home/nds/.local/share/mise/shims:/home/nds/.local/bin:/usr/local/bin:/usr/bin:/bin
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

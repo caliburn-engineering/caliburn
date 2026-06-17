@@ -1,0 +1,34 @@
+# User workspace (each project is its own git repo)
+projects/
+
+# Raw PDFs (gitignored, only book state files are tracked)
+tools/rag/raw/
+
+# C++ build artifacts
+build/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.out
+
+# Local-only skills (not version-controlled, not pushed to GitHub)
+.pi/skills/local-*/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (RAG pipeline)
+node_modules/
+dist/
+*.js.map

@@ -1,0 +1,9 @@
+{
+  "compaction": {
+    "enabled": true,
+    "strategy": "auto"
+  },
+  "trust": {
+    "level": "full"
+  }
+}
