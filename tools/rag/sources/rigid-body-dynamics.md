@@ -1,7 +1,7 @@
 ---
 title: Rigid Body Dynamics
 author: Various
-file: ../raw/rigid-body-dynamics.pdf
+file: ../raw/simulation/rigid-body/rigid-body-dynamics-978-3-11-054444-2_compress.pdf
 status: not-started
 ---
 

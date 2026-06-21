@@ -2,7 +2,7 @@
 title: Advanced Engineering Mathematics
 author: Erwin Kreyszig
 edition: 10th
-file: ../raw/kreyszig-aem.pdf
+file: "../raw/math/AdvancedEngineeringMathematics (1).pdf"
 status: not-started
 ---
 

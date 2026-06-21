@@ -11,4 +11,7 @@ Feedback control, state estimation, and stability analysis.
 
 ## Topics (Root Level)
 
-*Topics added here as knowledge is ingested.*
+| Topic | Description |
+|---|---|
+| [State-Space Representation](state-space.md) | ABCD form, controllability, observability, discretization methods |
+| [Stability Analysis](stability.md) | Eigenvalue criterion, Lyapunov theory, Routh-Hurwitz, stability margins |

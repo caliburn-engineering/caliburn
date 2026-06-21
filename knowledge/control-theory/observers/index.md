@@ -4,4 +4,7 @@ State estimation algorithms — reconstructing system state from noisy measureme
 
 ## Topics
 
-*Topics added here as knowledge is ingested.*
+| Topic | Description |
+|---|---|
+| [Discrete-Time Kalman Filter](kalman-filter.md) | Predict-update cycle for linear state estimation |
+| [Extended Kalman Filter](extended-kalman.md) | Kalman filter for nonlinear systems via Jacobian linearization |

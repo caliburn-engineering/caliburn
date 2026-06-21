@@ -1,7 +1,7 @@
 ---
 title: "Quaternions and Rotation Sequences: A Primer with Applications to Orbits, Aerospace, and Virtual Reality"
 author: Jack B. Kuipers
-file: ../raw/kuipers-quaternions.pdf
+file: ../raw/math/quaternions-and-rotation-sequences-a-primer-with-applications-to-orbits-aerospace-and-virtual-reality-9780691211701_compress.pdf
 status: not-started
 ---
 

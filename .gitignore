@@ -24,6 +24,9 @@ cmake-build-*/
 *.swo
 *~
 
+# Obsidian (vault config, not relevant to Caliburn)
+.obsidian/
+
 # OS
 .DS_Store
 Thumbs.db

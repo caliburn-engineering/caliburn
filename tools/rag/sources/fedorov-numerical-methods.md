@@ -2,14 +2,14 @@
 title: "Yet Another Introduction to Numerical Methods"
 author: Dmitri V. Fedorov
 edition: "v13.05"
-file: ../raw/fedorov-numerical-methods.pdf
-status: not-started
+file: ../raw/math/computational/numerical-methods.pdf
+status: in-progress
 ---
 
 ## Progress
 
 ### Interpolation & Integration
-- [ ] Ch.1 Interpolation (pp. 1-12)
+- [x] Ch.1 Interpolation (pp. 1-12) → knowledge/math/numerical-methods/interpolation-techniques-in-numerical-methods.md
 - [ ] Ch.2 Numerical Integration (pp. 13-26)
 - [ ] Ch.3 Monte Carlo Integration (pp. 27-34)
 

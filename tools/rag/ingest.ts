@@ -17,6 +17,7 @@
 
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { loadAllBooks, pickNextIngestion, markSectionComplete } from "./lib/book-state.js";
 import { extractSection } from "./lib/pdf-extract.js";
 import {
@@ -109,8 +110,9 @@ async function writeKnowledge(
 
   const modelRegistry = ModelRegistry.create(authStorage);
 
-  // Pick a model — prefer Sonnet for cost efficiency on nightly runs
+  // Pick a model — prefer local Ollama (free, runs unattended at 3 AM)
   const preferredModels = [
+    ["ollama", "qwen3:8b"],
     ["anthropic", "claude-sonnet-4-5"],
     ["anthropic", "claude-sonnet-4-6"],
     ["google", "gemini-2.5-pro"],
@@ -152,8 +154,9 @@ async function writeKnowledge(
   });
 
   let resultPath: string | undefined;
+  let textBuffer = "";
 
-  // Listen for tool executions to capture the write path
+  // Listen for tool executions to capture the write path, and buffer text output
   session.subscribe((event) => {
     if (event.type === "tool_execution_end" && !event.isError) {
       // Try to capture knowledge file path from write operations
@@ -164,7 +167,9 @@ async function writeKnowledge(
       }
     }
     if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
-      process.stdout.write(event.assistantMessageEvent.delta);
+      const delta = event.assistantMessageEvent.delta;
+      textBuffer += delta;
+      process.stdout.write(delta);
     }
   });
 
@@ -238,7 +243,182 @@ Focus on content relevant to control engineering, simulation, and linear algebra
     session.dispose();
   }
 
+  // Fallback: if the model output a knowledge file as text instead of calling the tool,
+  // extract the markdown and write it ourselves
+  if (!resultPath && textBuffer.includes("---\ntitle:")) {
+    console.log("\n📝 Model output knowledge file as text — writing via fallback...");
+    resultPath = await writeFallbackKnowledge(textBuffer, book, section, CALIBURN_ROOT);
+  }
+
   return resultPath;
+}
+
+/**
+ * Fallback: extract a knowledge file from the model's text output and write it.
+ * Used when the model outputs markdown instead of calling the write_knowledge tool.
+ */
+async function writeFallbackKnowledge(
+  text: string,
+  book: { meta: { title: string; author: string } },
+  section: { label: string; group: string; pages?: { start: number; end: number } },
+  caliburnRoot: string
+): Promise<string | undefined> {
+  // Extract markdown between ```markdown ... ``` or starting from ---\ntitle:
+  let content: string | undefined;
+
+  // Try fenced code block first
+  const fenced = text.match(/```markdown\s*\n(---\n[\s\S]*?\n---[\s\S]*?)```/);
+  if (fenced) {
+    content = fenced[1].trim();
+  } else {
+    // Try raw frontmatter block
+    const raw = text.match(/(---\ntitle:[\s\S]*)/);
+    if (raw) {
+      content = raw[1].trim();
+      // Remove trailing ``` if present
+      content = content.replace(/\n```\s*$/, "").trim();
+    }
+  }
+
+  if (!content) return undefined;
+
+  // Extract title from frontmatter for filename
+  const titleMatch = content.match(/title:\s*(.+)/);
+  if (!titleMatch) return undefined;
+  const title = titleMatch[1].trim().replace(/^["']|["']$/g, "");
+
+  // Determine placement from the section group
+  const group = section.group.toLowerCase();
+  let subdir: string;
+  if (group.includes("interpolat") || group.includes("integrat") || group.includes("numerical")) {
+    subdir = "math/numerical-methods";
+  } else if (group.includes("differential") || group.includes("ode")) {
+    subdir = "math/numerical-methods";
+  } else if (group.includes("linear algebra") || group.includes("eigenvalue")) {
+    subdir = "math/linear-algebra";
+  } else if (group.includes("control") || group.includes("controller")) {
+    subdir = "control-theory";
+  } else if (group.includes("simulat") || group.includes("rigid")) {
+    subdir = "simulation";
+  } else {
+    subdir = "math";
+  }
+
+  // Generate filename from title
+  const filename = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    + ".md";
+
+  const relPath = `knowledge/${subdir}/${filename}`;
+  const absPath = resolve(caliburnRoot, relPath);
+
+  // Fix requires/related paths to point to actual files
+  // Replace invented paths with empty arrays to avoid broken links
+  content = content.replace(
+    /requires:\n((?:\s+-\s+.*\n)*)/,
+    (match, entries) => {
+      const lines = entries.trim().split("\n");
+      const valid = lines.filter((line: string) => {
+        const pathMatch = line.match(/^\s+-\s+"?([^"]+)"?\s*$/);
+        if (!pathMatch) return false;
+        const refPath = resolve(dirname(absPath), pathMatch[1]);
+        return existsSync(refPath);
+      });
+      return valid.length > 0
+        ? `requires:\n${valid.join("\n")}\n`
+        : "requires: []\n";
+    }
+  );
+  content = content.replace(
+    /related:\n((?:\s+-\s+.*\n)*)/,
+    (match, entries) => {
+      const lines = entries.trim().split("\n");
+      const valid = lines.filter((line: string) => {
+        const pathMatch = line.match(/^\s+-\s+"?([^"]+)"?\s*$/);
+        if (!pathMatch) return false;
+        const refPath = resolve(dirname(absPath), pathMatch[1]);
+        return existsSync(refPath);
+      });
+      return valid.length > 0
+        ? `related:\n${valid.join("\n")}\n`
+        : "related: []\n";
+    }
+  );
+
+  // Ensure directory exists
+  const dir = dirname(absPath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  // Write the file
+  writeFileSync(absPath, content, "utf-8");
+  console.log(`   Wrote: ${relPath}`);
+
+  // Update or create parent index.md
+  const indexPath = resolve(dir, "index.md");
+  if (existsSync(indexPath)) {
+    const indexContent = readFileSync(indexPath, "utf-8");
+    const baseName = filename.replace(".md", "");
+    if (!indexContent.includes(baseName)) {
+      const entry = `| [${title}](${filename}) | |\n`;
+      if (indexContent.includes("| ---")) {
+        const lines = indexContent.split("\n");
+        let lastTableLine = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (lines[i].startsWith("|") && !lines[i].includes("---")) {
+            lastTableLine = i;
+            break;
+          }
+        }
+        if (lastTableLine >= 0) {
+          lines.splice(lastTableLine + 1, 0, entry.trimEnd());
+          writeFileSync(indexPath, lines.join("\n"), "utf-8");
+          console.log(`   Updated index: ${subdir}/index.md`);
+        }
+      }
+    }
+  } else {
+    // Create a new index for new subcategories
+    const indexContent = `# ${subdir.split("/").pop()!.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+
+## Topics
+
+| Topic | Description |
+|---|---|
+| [${title}](${filename}) | |
+`;
+    writeFileSync(indexPath, indexContent, "utf-8");
+    console.log(`   Created index: ${subdir}/index.md`);
+
+    // Also update the parent math/index.md if we created a new subcategory
+    const parentIndexPath = resolve(dir, "../index.md");
+    if (existsSync(parentIndexPath)) {
+      const parentContent = readFileSync(parentIndexPath, "utf-8");
+      const subcatName = subdir.split("/").pop()!;
+      if (!parentContent.includes(subcatName)) {
+        const subcatTitle = subcatName.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        const entry = `| ${subcatTitle} | [${subcatName}/](${subcatName}/index.md) | |\n`;
+        const lines = parentContent.split("\n");
+        let lastTableLine = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (lines[i].startsWith("|") && !lines[i].includes("---")) {
+            lastTableLine = i;
+            break;
+          }
+        }
+        if (lastTableLine >= 0) {
+          lines.splice(lastTableLine + 1, 0, entry.trimEnd());
+          writeFileSync(parentIndexPath, lines.join("\n"), "utf-8");
+          console.log(`   Updated parent index: ${subdir.split("/").slice(0, -1).join("/")}/index.md`);
+        }
+      }
+    }
+  }
+
+  return relPath;
 }
 
 main().catch((err) => {
