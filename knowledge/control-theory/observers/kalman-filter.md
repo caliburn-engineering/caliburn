@@ -9,6 +9,7 @@ requires:
 related:
   - extended-kalman.md
   - ../controllers/lqr.md
+reference: ../../../reference/observers/kalman_filter.h
 ---
 
 # Discrete-Time Kalman Filter

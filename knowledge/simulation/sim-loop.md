@@ -7,6 +7,7 @@ requires:
 related:
   - rk4.md
   - variable-vs-fixed.md
+reference: ../../reference/simulation/sim_loop.h
 ---
 
 # Real-Time Simulation Loop

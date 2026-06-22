@@ -7,6 +7,7 @@ requires:
   - ../state-space.md
 related:
   - controllers/lqr.md
+reference: ../../../reference/controllers/pid.h
 ---
 
 # PID Control

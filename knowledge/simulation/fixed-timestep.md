@@ -8,6 +8,7 @@ requires:
 related:
   - sim-loop.md
   - variable-vs-fixed.md
+reference: ../../reference/simulation/fixed_timestep.h
 ---
 
 # Fixed-Timestep Accumulator Pattern

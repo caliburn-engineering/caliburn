@@ -9,6 +9,7 @@ requires:
 related:
   - fixed-timestep.md
   - sim-loop.md
+reference: ../../reference/integrators/rk4.h
 ---
 
 # Runge-Kutta 4th Order Integration

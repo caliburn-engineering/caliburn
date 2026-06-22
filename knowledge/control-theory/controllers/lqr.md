@@ -8,6 +8,7 @@ requires:
 related:
   - pid.md
   - ../observers/kalman-filter.md
+reference: ../../../reference/controllers/lqr.h
 ---
 
 # Linear-Quadratic Regulator
