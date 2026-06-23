@@ -68,3 +68,46 @@ add_executable(test_sim_loop
 )
 target_include_directories(test_sim_loop PRIVATE simulation)
 add_test(NAME sim_loop COMMAND test_sim_loop)
+
+# --- Constraint Enforcer ---
+add_executable(test_constraint_enforcer
+    simulation/constraint_enforcer.cpp
+    simulation/test_constraint_enforcer.cpp
+)
+target_include_directories(test_constraint_enforcer PRIVATE simulation)
+target_link_libraries(test_constraint_enforcer PRIVATE Eigen3::Eigen)
+add_test(NAME constraint_enforcer COMMAND test_constraint_enforcer)
+
+# --- Trajectory Planner ---
+add_executable(test_trajectory_planner
+    controllers/trajectory_planner.cpp
+    controllers/test_trajectory_planner.cpp
+)
+target_include_directories(test_trajectory_planner PRIVATE controllers)
+add_test(NAME trajectory_planner COMMAND test_trajectory_planner)
+
+# --- Servo Model ---
+add_executable(test_servo_model
+    simulation/servo_model.cpp
+    simulation/test_servo_model.cpp
+)
+target_include_directories(test_servo_model PRIVATE simulation)
+add_test(NAME servo_model COMMAND test_servo_model)
+
+# --- Rolling Dynamics ---
+add_executable(test_rolling_dynamics
+    simulation/rolling_dynamics.cpp
+    simulation/test_rolling_dynamics.cpp
+)
+target_include_directories(test_rolling_dynamics PRIVATE simulation)
+target_link_libraries(test_rolling_dynamics PRIVATE Eigen3::Eigen)
+add_test(NAME rolling_dynamics COMMAND test_rolling_dynamics)
+
+# --- Homogeneous Transforms ---
+add_executable(test_homogeneous_transform
+    math/homogeneous_transform.cpp
+    math/test_homogeneous_transform.cpp
+)
+target_include_directories(test_homogeneous_transform PRIVATE math)
+target_link_libraries(test_homogeneous_transform PRIVATE Eigen3::Eigen)
+add_test(NAME homogeneous_transform COMMAND test_homogeneous_transform)

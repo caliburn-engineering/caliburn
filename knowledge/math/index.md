@@ -9,3 +9,4 @@ Mathematical foundations for engineering — linear algebra, probability, numeri
 | Linear Algebra | [linear-algebra/](linear-algebra/index.md) | Matrices, eigenvalues, state-space transformations (Eigen-focused) |
 | Probability | [probability/](probability/index.md) | Probability theory, Bayesian estimation, noise models |
 | Numerical Methods | [numerical-methods/](numerical-methods/index.md) | |
+| Transforms | [transforms/](transforms/index.md) | Coordinate frame transformations, homogeneous matrices |

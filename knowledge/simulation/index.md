@@ -6,6 +6,8 @@ Real-time simulation patterns — integration schemes, timestep management, loop
 
 | Subcategory | Description |
 |---|---|
+| [Architecture](architecture/index.md) | Software patterns for modular simulation engines |
+| [Contact Physics](contact-physics/index.md) | Surface interactions, friction, rolling dynamics |
 | [Rigid Body Dynamics](rigid-body/index.md) | Forces, torques, inertia tensors, quaternion rotation for rigid body simulation |
 
 ## Topics

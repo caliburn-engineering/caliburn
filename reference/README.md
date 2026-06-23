@@ -18,6 +18,7 @@ Golden-source C++ implementations of core engineering algorithms.
 | `controllers/` | Feedback controllers (PID, LQR) |
 | `observers/` | State estimators (Kalman filter, EKF) |
 | `simulation/` | Simulation loop patterns (fixed-timestep, accumulator) |
+| `math/` | Coordinate transforms (homogeneous matrices) |
 | `rendering/` | ImGui + ImPlot setup and helpers (no tests — UI code) |
 
 ## Building

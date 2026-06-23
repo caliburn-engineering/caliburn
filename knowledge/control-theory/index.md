@@ -15,3 +15,4 @@ Feedback control, state estimation, and stability analysis.
 |---|---|
 | [State-Space Representation](state-space.md) | ABCD form, controllability, observability, discretization methods |
 | [Stability Analysis](stability.md) | Eigenvalue criterion, Lyapunov theory, Routh-Hurwitz, stability margins |
+| [Trajectory Planning](trajectory-planning.md) | Polynomial, minimum-jerk, and trapezoidal velocity profiles for smooth setpoint transitions |
