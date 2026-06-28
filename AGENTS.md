@@ -10,7 +10,7 @@ Caliburn is an open-source engineering AI workspace. You are an engineering assi
 | `reference/` | Golden-source C++ implementations (standalone, tested, Eigen-based) |
 | `projects/` | User workspace — each subfolder is its own git repo |
 | `tools/rag/` | Knowledge ingestion pipeline (PDF → structured markdown) |
-| `.pi/skills/` | Engineering skills — `new-project`, `design-controller`, `design-observer`, `explain-concept`, `validate-implementation` |
+| `.pi/skills/` | Engineering skills — `new-project`, `design-controller`, `design-observer`, `explain-concept`, `validate-implementation`, `scaffold-sim-viewer`, `grill-mechanism`, `validate-mechanism` |
 | `.pi/extensions/` | TypeScript extensions (sub-agent orchestration) |
 
 ## Knowledge Conventions

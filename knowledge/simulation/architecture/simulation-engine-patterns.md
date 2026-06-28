@@ -70,13 +70,13 @@ This separates physics rate (fixed dt, e.g. 1 kHz) from render rate (variable, e
 
 ### Swappability Examples
 
-| Swap | From → To | What changes | What doesn't |
-|---|---|---|---|
-| Integrator | Euler → RK4 | `integrator` argument | Loop, controller, observer |
-| Controller | PID → LQR | `controller` argument | Loop, integrator, observer |
-| Observer | KF → EKF | `observer` argument | Loop, integrator, controller |
-| Renderer | ImGui → OpenGL | `renderer` argument | Entire physics pipeline |
-| Plant | Ball-balancer → Pendulum | `plant` argument | All infrastructure |
+| Swap       | From → To                | What changes          | What doesn't                 |
+| ---------- | ------------------------ | --------------------- | ---------------------------- |
+| Integrator | Euler → RK4              | `integrator` argument | Loop, controller, observer   |
+| Controller | PID → LQR                | `controller` argument | Loop, integrator, observer   |
+| Observer   | KF → EKF                 | `observer` argument   | Loop, integrator, controller |
+| Renderer   | ImGui → OpenGL           | `renderer` argument   | Entire physics pipeline      |
+| Plant      | Ball-balancer → Pendulum | `plant` argument      | All infrastructure           |
 
 ### When to Use Inheritance vs. Templates
 
