@@ -7,6 +7,9 @@ requires:
   - ../../math/linear-algebra/eigenvalues.md
 related:
   - pid.md
+  - sliding-mode.md
+  - lqg.md
+  - comparison.md
   - ../observers/kalman-filter.md
 reference: ../../../reference/controllers/lqr.h
 ---
@@ -80,7 +83,23 @@ The Riccati equation becomes a differential equation solved backward from P(T) =
 
 The gain K(t) = R^{-1} B^T P(t) is time-varying. For most regulation tasks, the infinite-horizon formulation suffices and K is constant.
 
+## Robustness Properties
+
+Standalone LQR (with true full-state feedback) has excellent robustness guarantees:
+- **Infinite gain margin** — the closed-loop remains stable for any multiplicative gain increase
+- **Phase margin >= 60 degrees** — substantial tolerance to unmodelled delays/dynamics
+
+These margins come from the return-difference identity: `|I + K(sI - A)^{-1}B| >= 1` for all s on the imaginary axis.
+
+**WARNING:** These guarantees are LOST when LQR is combined with a Kalman filter (LQG). The observer can introduce arbitrarily poor margins. See [LQG](lqg.md) for details.
+
 ## Choosing Q and R Matrices
+
+### Plain-English Framing
+
+> **Q says what I care about. R says what's expensive.**
+
+Q penalises state deviations — large Q entries mean "I care strongly about keeping this state near zero." R penalises control effort — large R entries mean "using this actuator is expensive (energy, wear, saturation risk)."
 
 ### Structure
 
@@ -90,6 +109,15 @@ Q and R are typically diagonal. Each diagonal entry weights the corresponding st
 Q = diag(q_1, q_2, ..., q_n)    — one weight per state
 R = diag(r_1, r_2, ..., r_m)    — one weight per control input
 ```
+
+### Tuning Cheat Sheet
+
+| Goal | Adjust |
+|---|---|
+| Faster convergence of state i | Increase Q(i,i) |
+| Less actuator j usage | Increase R(j,j) |
+| Good starting point | Q = C^T*C, R = I |
+| Penalise output error only | Bryson's rule: Q(i,i) = 1/x_max^2 |
 
 ### Tuning Intuition
 

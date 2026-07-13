@@ -6,7 +6,11 @@ sources:
 requires:
   - ../state-space.md
 related:
-  - controllers/lqr.md
+  - lqr.md
+  - sliding-mode.md
+  - ../steady-state-error.md
+  - ../second-order-systems.md
+  - ../frequency-response.md
 reference: ../../../reference/controllers/pid.h
 ---
 
@@ -134,6 +138,61 @@ Ziegler-Nichols tends to produce aggressive, oscillatory responses (quarter-deca
 2. Add Kd to damp oscillation. Typical starting ratio: Kd/Kp = 0.1 * dt_sample.
 3. Add Ki last to eliminate steady-state error. Start small: Ki = Kp / (10 * T_settle).
 
+## Diagnostic Tuning Table
+
+When observing closed-loop behaviour, use this table to diagnose and fix:
+
+| Observed Symptom | Most Likely Cause | Recommended Action |
+|---|---|---|
+| Persistent steady-state offset | No I term, or Ki too low | Add/increase Ki |
+| Excessive overshoot (>20%) | Kp too high, or insufficient damping | Increase Kd or decrease Kp |
+| Sluggish response (slow rise) | Kp too low | Increase Kp |
+| Sustained oscillation (constant amplitude) | At stability boundary | Reduce Kp, check phase margin |
+| Growing oscillation | Unstable — gain too high | Reduce Kp immediately |
+| Actuator chattering (rapid switching) | Derivative amplifying noise | Filter derivative (increase tau_f), or reduce Kd |
+| Output saturates and stays stuck | Integrator windup | Add anti-windup (see above) |
+| Oscillation only after setpoint change | Derivative kick | Switch to derivative-on-measurement |
+| Good tracking but poor disturbance rejection | Insufficient loop gain at disturbance frequency | Increase Ki (for low-freq disturbance) or Kp (for mid-freq) |
+| Response good at one operating point, bad at another | Plant nonlinearity (gain varies with state) | Gain scheduling — vary PID gains with operating point |
+
+**Meta-rule:** If in doubt, measure the phase margin. PM < 30° means you're too aggressive.
+PM > 70° means you're too conservative. Target 45-60° for a good balance.
+
+## Steady-State Error and System Type
+
+Adding the I term introduces a pole at s=0, increasing the system type by 1.
+A type-1 system has zero steady-state error for step inputs (the Final Value Theorem guarantee).
+
+For the complete theory of system types, error constants, and the error table
+for different input types, see [Steady-State Error](../steady-state-error.md).
+
+## Automotive PID Applications
+
+PID is ubiquitous in vehicle control. These examples show how the same algorithm adapts to different domains:
+
+| System | Controlled Variable | Controller Type | Key Notes |
+|---|---|---|---|
+| **Cruise control** | Vehicle speed | PI + feedforward | Feedforward for road grade (if inclinometer available). I for steady-state accuracy. D rarely used — vehicle dynamics are already well-damped. |
+| **Idle speed control** | Engine RPM at idle | PI | Anti-windup critical — throttle actuator saturates at closed position. Load disturbances from A/C compressor, power steering pump. |
+| **Electronic throttle** | Throttle plate angle | PID | Filtered D essential — throttle position sensor is noisy. Fast response needed (~50ms settling). |
+| **Boost pressure (turbo)** | Intake manifold pressure | PI + gain scheduling | Wastegate actuator. Gains vary with engine RPM and load — the turbo's response characteristics change across the map. |
+| **Coolant temperature** | Engine/battery temp | PI | D rarely used — thermal systems are slow and noisy. Long time constants (minutes). Tight anti-windup for heater/cooler on/off. |
+| **Traction control** | Wheel slip ratio | PID (limited) | Fixed PID struggles — tyre curve is nonlinear (gain changes across operating point). Real systems use gain-scheduled PID or switch to nonlinear control (SMC). |
+| **EGR valve** | Exhaust gas recirculation rate | PI | Position control of EGR valve against exhaust pressure disturbance. |
+| **Fuel rail pressure** | Common rail pressure | PI | High-pressure system (2000+ bar). Fast dynamics, tight tolerance. |
+
+### Common Automotive PID Patterns
+
+1. **Feedforward + PI feedback:** Use known physics (gravity, drag, load) for the bulk of the control effort. PI handles the residual error. Reduces reliance on high gains.
+
+2. **Gain scheduling:** When the plant gain changes with operating point (speed, RPM, temperature), vary PID gains accordingly. Implemented as lookup tables indexed by operating condition.
+
+3. **Cascaded loops:** Outer loop (slower) sets the reference for an inner loop (faster). Example: outer = speed controller (PI), inner = torque controller (fast PI or feedforward).
+
+4. **Anti-windup everywhere:** Automotive actuators saturate constantly (throttle limits, brake pressure limits, motor torque limits). Every I term needs anti-windup.
+
+5. **Derivative filtering always:** Real sensors are noisy. No automotive PID uses raw d/dt. Typical filter: first-order with tau_f = T_sample * 3-10.
+
 ## Implementation Notes
 
 ### Ball-Balancer Dual-Axis Coupling
@@ -167,3 +226,17 @@ Eigen::Vector2d output = Kp.cwiseProduct(error)
 - Reset the integrator on mode changes (e.g., switching from manual to auto).
 - Guard against dt = 0 (division by zero in derivative computation).
 - Limit dt to a sane range (e.g., 0.001 to 0.1 seconds) to reject spurious timer glitches.
+
+## Key Vocabulary (Interview-Ready)
+
+| Term | One-liner Definition |
+|---|---|
+| System type | Number of free integrators in open-loop — determines which inputs give zero e_ss |
+| Phase margin | How far from -180° the phase is at gain crossover — measures stability robustness |
+| Gain margin | How much gain can increase before instability — measured at -180° phase crossover |
+| Anti-windup | Mechanism to stop I-term growing when actuator is saturated |
+| Gain scheduling | Varying controller gains based on operating point — for nonlinear plants |
+| Feedforward | Open-loop correction from known disturbance — feedback handles the residual |
+| Derivative kick | Infinite derivative spike from step setpoint change — fix: differentiate PV only |
+| Back-calculation | Anti-windup method: undo integration when output saturates |
+| Bumpless transfer | Ensuring smooth controller output when switching modes (manual→auto) |

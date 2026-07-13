@@ -7,6 +7,7 @@ requires:
   - ../../math/linear-algebra/matrix-operations.md
   - ../state-space.md
 related:
+  - luenberger.md
   - extended-kalman.md
   - ../controllers/lqr.md
 reference: ../../../reference/observers/kalman_filter.h
@@ -207,3 +208,15 @@ struct KalmanFilter {
 - **Square-root filter:** For embedded or low-precision contexts, store the Cholesky factor $C$ where $P = C C^\top$ instead of $P$. This doubles the effective numerical range. The Apollo Guidance Computer used this approach.
 - **State scaling:** Keep state elements at similar numerical scales. Mixing metres and microradians in the same state vector causes catastrophic cancellation. Use appropriate units or normalisation.
 - **Discretisation:** When deriving $F$ from continuous-time dynamics $\dot{x} = F_c x$, use the matrix exponential $F = e^{F_c \Delta t}$. For small $\Delta t$, the first-order approximation $F \approx I + F_c \Delta t$ is acceptable but drifts for larger steps. The bilinear (Tustin) transform offers a good middle ground.
+
+## Relationship to Luenberger Observer
+
+The Kalman filter is the stochastic optimal version of the Luenberger observer.
+Instead of choosing L by pole placement, Kalman computes L to minimise
+estimation error covariance given noise statistics.
+
+See [Luenberger Observer](luenberger.md) for the deterministic foundation.
+
+Tuning intuition (maps between the two):
+- Large Qn/Rn → high observer gain → fast poles → trust sensors → noisy estimate
+- Small Qn/Rn → low observer gain → slow poles → trust model → smooth estimate

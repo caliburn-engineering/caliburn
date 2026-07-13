@@ -20,6 +20,7 @@ Golden-source C++ implementations of core engineering algorithms.
 | `simulation/` | Simulation loop patterns (fixed-timestep, accumulator) |
 | `math/` | Coordinate transforms (homogeneous matrices) |
 | `rendering/` | ImGui + ImPlot setup and helpers (no tests — UI code) |
+| `vehicle-dynamics/` | Bicycle model, tyre model (Pacejka), traction circle |
 
 ## Building
 

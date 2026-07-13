@@ -24,8 +24,18 @@ Read `knowledge/control-theory/observers/index.md` to see the current observer c
 
 | Observer | Knowledge File |
 |---|---|
+| Luenberger Observer | `knowledge/control-theory/observers/luenberger.md` |
 | Discrete-Time Kalman Filter | `knowledge/control-theory/observers/kalman-filter.md` |
 | Extended Kalman Filter | `knowledge/control-theory/observers/extended-kalman.md` |
+
+### Luenberger Observer
+- **When:** Deterministic system, noise characteristics unknown or unimportant, want direct control over convergence speed
+- **Prerequisites:** Observable system (A, C), desired convergence rate relative to controller
+- **Design:** Place observer poles 2-10x faster than controller poles
+- **Strengths:** Simple, transparent, direct pole control, no noise model needed
+- **Weaknesses:** No noise optimality, requires manual pole selection
+- **Knowledge file:** `knowledge/control-theory/observers/luenberger.md`
+- **Reference:** `reference/observers/luenberger.h`
 
 If the index lists new entries, include them. Never recommend an observer that has no knowledge file.
 
@@ -37,12 +47,24 @@ For each candidate observer, read its knowledge file. Extract:
 - **Tuning considerations** — what knobs exist, what are the trade-offs?
 - **Prerequisites** — check the `requires` field in YAML frontmatter (e.g., `knowledge/math/linear-algebra/eigenvalues.md`, `knowledge/control-theory/state-space.md`)
 
-If the user's system is **linear**, start with the Kalman filter from `knowledge/control-theory/observers/kalman-filter.md`.
+### Selection Logic
+
+| Condition | Recommended Observer |
+|---|---|
+| Noise statistics known and matter | Kalman filter |
+| Noise statistics unknown, want deterministic convergence | Luenberger |
+| Nonlinear system | EKF (or Extended Luenberger with Jacobian) |
+| Both Kalman and Luenberger need observability | Check observability first |
+
+If the user's system is **linear with unknown noise**: start with Luenberger from `knowledge/control-theory/observers/luenberger.md`. It gives direct pole control without requiring a noise model.
+
+If the user's system is **linear with known noise statistics**: start with the Kalman filter from `knowledge/control-theory/observers/kalman-filter.md`. It will optimally balance speed vs. noise rejection.
 
 If the user's system is **nonlinear**, read both `knowledge/control-theory/observers/kalman-filter.md` and `knowledge/control-theory/observers/extended-kalman.md`. Compare:
 
 - KF requires a linear state-space model — will not handle nonlinear dynamics without pre-linearization
 - EKF linearizes via Jacobians at each step — handles mild nonlinearity but diverges on strongly nonlinear systems
+- Luenberger can be extended to nonlinear systems by replacing A with the Jacobian (Extended Luenberger) but this is uncommon — prefer EKF
 - Cite the specific trade-off sections from each knowledge file
 
 ## Step 4 — Recommend with Rationale
@@ -65,10 +87,12 @@ Ground every statement in the knowledge file content — do not improvise tuning
 
 ## Step 6 — Reference Implementation
 
-Point the user to the reference C++ implementation:
+Point the user to the reference C++ implementation for the recommended observer:
 
-- Header: `reference/observers/kalman_filter.h`
-- Source: `reference/observers/kalman_filter.cpp`
+| Observer | Header | Source |
+|---|---|---|
+| Luenberger | `reference/observers/luenberger.h` | `reference/observers/luenberger.cpp` |
+| Kalman Filter | `reference/observers/kalman_filter.h` | `reference/observers/kalman_filter.cpp` |
 
 Read the `requires` frontmatter from the observer's knowledge file to list any mathematical prerequisites the user needs before reading the implementation.
 

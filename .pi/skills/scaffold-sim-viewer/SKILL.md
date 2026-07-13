@@ -54,6 +54,9 @@ Completion: renderer compiles standalone (no project-specific code).
 
 Create `src/visualizer.cpp` with the full main loop. Every viewer must include these **invariants** — they are non-negotiable:
 
+### Font
+- Load a Unicode-capable font (Noto Sans, DejaVu Sans, or similar) via `io.Fonts->AddFontFromFileTTF()` with Greek and mathematical symbol ranges merged. This enables proper labels (α, β, θ, φ, ω, etc.) throughout the UI. Bundle the `.ttf` in `vendor/fonts/`.
+
 ### Docking & persistence
 - `ImGuiConfigFlags_DockingEnable` always set.
 - Full-window dockspace (`ImGuiDockNodeFlags_PassthruCentralNode`).
@@ -66,6 +69,7 @@ Create `src/visualizer.cpp` with the full main loop. Every viewer must include t
 ### Controls panel
 - Sliders for each tunable parameter identified in Step 1.
 - Preset buttons for common configurations.
+- A **"Pause"** button that freezes simulation time (see Plots panel for pause behaviour).
 - FK/IK/solver status with color-coded text (green = OK, red = FAIL).
 - Collapsible sections for advanced info (Jacobian, raw state).
 
@@ -73,20 +77,42 @@ Create `src/visualizer.cpp` with the full main loop. Every viewer must include t
 - Rendered behind the docked panels via `PassthruCentralNode`.
 - Orbit camera with mouse drag + scroll zoom.
 - Ground grid, coordinate axes (RGB = XYZ), display toggles.
-- All planar surfaces rendered as filled `disc()` with alpha transparency, plus an edge `circle()`.
+- All planar surfaces rendered as filled `disc()` with low alpha (0.10–0.15). Disable depth writes (`glDepthMask(GL_FALSE)`) before drawing filled surfaces so geometry behind them remains visible. Re-enable depth writes after. Edge `circle()` drawn on top with full opacity.
 
-### Plots panel
-- **Time window slider** (2–60s range) controlling the visible x-axis span.
-- **Y-axis auto-fit**: use `ImPlotAxisFlags_AutoFit` so boundaries grow with data but never clip.
-- **Scrolling buffer** sized to at least 60 seconds of data at 60 fps (≥ 3600 samples).
+### Plots panel — time series invariants
+
+Every time series plot must follow these rules:
+
+**Layout**
+- Plots auto-size their height to divide available vertical space evenly, with a minimum height of 120 pixels per plot. If the available space cannot fit all plots at minimum height, the panel becomes scrollable.
+- **Plot visibility toggles**: a row of toggle buttons at the top of the plots panel, one per plot, labelled with the plot title. Clicking a button hides/shows that plot. Hidden plots free their vertical space for visible ones. The height calculation and scrolling logic use only the count of visible plots.
+- Legend placed **outside** the plot, to the **right** (`ImPlotLegendFlags_Outside`).
+- Legend labels are **max 2 characters**. The plot title carries the full context (e.g. title: "Servo Angles [deg]", legends: "α₀", "α₁", "α₂").
+
+**Data & buffer**
+- Scrolling circular buffer sized to at least 60 seconds of data at 60 fps (≥ 3600 samples).
 - Use `ImPlotSpec` with `.Offset` for circular buffer rendering.
-- Plots auto-size their height to divide available vertical space evenly.
+- A **"Clear Data"** button that flushes the buffer. Plots start refilling from empty.
+
+**Time axis**
+- **Time window slider** (2–60s range) controlling the visible x-axis span.
+
+**Y-axis scaling**
+- Y-axis auto-fits to the data **within the visible time window only**, not the full buffer. Compute min/max of visible data and set Y-limits with a small margin (5%).
+- When a data series is hidden via legend toggle, the Y-limits exclude that series and refit to the remaining visible series only.
+
+**Synchronized cursor**
+- When the mouse hovers over any time series plot, draw a **vertical line at the cursor time on all time series plots** simultaneously.
+- On the plot being hovered, show a **tooltip window** with the exact values of all visible series at that time instant.
+- **Click** on a plot to place a **persistent marker**: a vertical line that remains on all plots plus a pinned tooltip on the clicked plot. Multiple markers can coexist. Provide a way to clear all markers.
+
+**Pause & time-zoom**
+- When simulation is paused, the time axis stops advancing and data stops appending.
+- While paused, show **time range sliders** (start/end) that let the user zoom into any sub-range of the buffered data for analysis.
+- Hover cursor and click-markers remain functional while paused.
 
 ### Blending
 - `glEnable(GL_BLEND)` + `glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)` always active.
-
-### Labels
-- Use ASCII text for all labels (`a0 [deg]`, not `α₀ [°]`). The default ImGui font lacks Unicode.
 
 Completion: `cmake --build build` succeeds. The visualizer launches, displays the 3D scene, and all panels respond to input. The Reset button recovers from any state.
 

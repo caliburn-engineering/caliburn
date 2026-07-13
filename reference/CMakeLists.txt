@@ -44,6 +44,15 @@ target_include_directories(test_lqr PRIVATE controllers)
 target_link_libraries(test_lqr PRIVATE Eigen3::Eigen)
 add_test(NAME lqr COMMAND test_lqr)
 
+# --- SMC (Sliding Mode Control) ---
+add_executable(test_smc
+    controllers/smc.cpp
+    controllers/test_smc.cpp
+)
+target_include_directories(test_smc PRIVATE controllers)
+target_link_libraries(test_smc PRIVATE Eigen3::Eigen)
+add_test(NAME smc COMMAND test_smc)
+
 # --- Observers ---
 add_executable(test_kalman
     observers/kalman_filter.cpp
@@ -52,6 +61,14 @@ add_executable(test_kalman
 target_include_directories(test_kalman PRIVATE observers)
 target_link_libraries(test_kalman PRIVATE Eigen3::Eigen)
 add_test(NAME kalman COMMAND test_kalman)
+
+add_executable(test_luenberger
+    observers/luenberger.cpp
+    observers/test_luenberger.cpp
+)
+target_include_directories(test_luenberger PRIVATE observers)
+target_link_libraries(test_luenberger PRIVATE Eigen3::Eigen)
+add_test(NAME luenberger COMMAND test_luenberger)
 
 # --- Simulation ---
 add_executable(test_fixed_timestep
@@ -111,3 +128,20 @@ add_executable(test_homogeneous_transform
 target_include_directories(test_homogeneous_transform PRIVATE math)
 target_link_libraries(test_homogeneous_transform PRIVATE Eigen3::Eigen)
 add_test(NAME homogeneous_transform COMMAND test_homogeneous_transform)
+
+# --- Vehicle Dynamics: Bicycle Model ---
+add_executable(test_bicycle_model
+    vehicle-dynamics/bicycle_model.cpp
+    vehicle-dynamics/test_bicycle_model.cpp
+)
+target_include_directories(test_bicycle_model PRIVATE vehicle-dynamics)
+target_link_libraries(test_bicycle_model PRIVATE Eigen3::Eigen)
+add_test(NAME bicycle_model COMMAND test_bicycle_model)
+
+# --- Vehicle Dynamics: Tyre Model ---
+add_executable(test_tyre_model
+    vehicle-dynamics/tyre_model.cpp
+    vehicle-dynamics/test_tyre_model.cpp
+)
+target_include_directories(test_tyre_model PRIVATE vehicle-dynamics)
+add_test(NAME tyre_model COMMAND test_tyre_model)

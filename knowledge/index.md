@@ -12,3 +12,4 @@ Navigate top-down: pick a category, then drill into subcategories and individual
 | Mathematics | [math/](math/index.md) | Linear algebra, probability, numerical methods |
 | Rendering | [rendering/](rendering/index.md) | 3D graphics, shader pipelines, visualisation |
 | Simulation | [simulation/](simulation/index.md) | Real-time loops, integration schemes, timestep management |
+| Vehicle Dynamics | [vehicle-dynamics/](vehicle-dynamics/index.md) | Tyre dynamics, bicycle model, weight transfer, vehicle control systems, hybrid powertrain |

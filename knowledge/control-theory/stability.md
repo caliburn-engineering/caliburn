@@ -8,6 +8,10 @@ requires:
   - state-space.md
 related:
   - controllers/lqr.md
+  - frequency-response.md
+  - nyquist.md
+  - root-locus.md
+  - compensator-design.md
 ---
 
 # Stability Analysis
@@ -152,6 +156,10 @@ PM > 0 means stable. Typical target: PM >= 30-45 degrees.
 | Low phase margin | System is oscillatory, near resonance | Ball overshoots and rings before settling |
 
 Phase margin relates directly to damping ratio: PM ~ 100*zeta degrees for zeta < 0.7. A PM of 45 degrees corresponds to zeta ~ 0.45 — moderately damped.
+
+## Connection to Time-Domain Specifications
+
+Eigenvalue location directly determines transient behavior (overshoot, settling time, rise time). For the complete second-order analysis and specification tables — including the overshoot vs damping lookup table and the inverse problem (from specs to required poles) — see [Second-Order Systems](second-order-systems.md).
 
 ## Implementation Notes
 
