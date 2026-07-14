@@ -11,6 +11,8 @@ related:
   - lqr.md
   - sliding-mode.md
   - ../stability.md
+  - ../design-problems/traction-control.md
+  - ../design-problems/active-suspension.md
 ---
 
 # Gain Scheduling

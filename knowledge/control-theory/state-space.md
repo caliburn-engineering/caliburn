@@ -9,6 +9,7 @@ related:
   - controllers/pid.md
   - controllers/lqr.md
   - observers/kalman-filter.md
+  - first-principles-modelling.md
 ---
 
 # State-Space Representation

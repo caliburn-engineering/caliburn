@@ -12,6 +12,7 @@ related:
   - nyquist.md
   - root-locus.md
   - compensator-design.md
+  - first-principles-modelling.md
 ---
 
 # Stability Analysis

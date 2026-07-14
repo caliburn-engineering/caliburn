@@ -13,6 +13,7 @@ Tyre mechanics, lateral dynamics models, weight transfer, and vehicle control sy
 | [Powertrain Torque Path](powertrain-torque-path.md) | Engine to road — clutch, gearbox, differential, tyre |
 | [Vehicle Control Systems](vehicle-control-systems.md) | ABS, TCS, ESP, suspension, EPS, torque vectoring, ADAS |
 | [Hybrid Powertrain](hybrid-powertrain.md) | Torque split, regen braking, SoC management, mode switching |
+| [Automotive Scenarios](automotive-scenarios.md) | Interview-style scenario questions testing vehicle control understanding |
 
 ## Glossary
 

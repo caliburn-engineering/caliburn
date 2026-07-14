@@ -1,29 +1,68 @@
 ---
 name: design-controller
-description: Guide controller selection for a plant/system based on the Caliburn knowledge base
+description: Guide controller design using the 6-step framework — from requirements through validation
 ---
 
 # Design Controller
 
-Walk the user through choosing and adapting a feedback controller for their plant. Every recommendation must be grounded in knowledge files — never invent control theory claims.
+Walk the user through a complete control design process using the [6-step design framework](knowledge/control-theory/design-framework.md). Every recommendation must be grounded in knowledge files — never invent control theory claims.
 
-## Step 1 — Characterise the Plant
+## Overview — The 6-Step Framework
 
-Ask the user to describe their system. Collect at minimum:
+Read `knowledge/control-theory/design-framework.md` at session start. The steps are:
+
+1. **Clarify requirements** — controlled variable, performance specs, constraints
+2. **Model the plant** — inputs, outputs, states, linear/nonlinear, block diagram
+3. **Assess controllability and observability** — can you control and observe with available hardware?
+4. **Choose control architecture** — PID / LQR / SMC / MPC / gain-scheduled? Justify the choice.
+5. **Address the hard parts** — nonlinearity, disturbances, noise, saturation, delays, uncertainty
+6. **Validation strategy** — MIL → SIL → HIL → hardware testing
+
+Do not skip upstream steps. Jumping to architecture selection (Step 4) without first understanding requirements, the plant, and C/O assessment leads to poor design decisions.
+
+## Step 1 — Clarify Requirements
+
+Ask the user to describe what the controller must achieve. Collect at minimum:
+
+- **Controlled variable** — what output is being regulated?
+- **Performance specs** — bandwidth, settling time, overshoot, steady-state accuracy
+- **Constraints** — actuator limits (saturation), safety bounds, computational latency
+- **Disturbances** — what external forces act on the system? Measurable or not?
+- **Failure modes** — what happens when a sensor or actuator fails? Fallback strategy?
+
+Do not proceed until requirements are sufficiently clear. If the user cannot specify performance numbers, help them derive reasonable targets from the application domain.
+
+## Step 2 — Model the Plant
+
+Guide the user through plant modelling. Key questions:
 
 - **SISO or MIMO** — single-input/single-output vs multi-input/multi-output
-- **Linear or nonlinear** — and if nonlinear, whether a valid operating point exists for linearization
-- **Sensors and actuators** — what signals are measurable, what inputs are available
-- **State observability** — are all states directly measurable, or is an observer needed?
-- **Constraints** — hard limits on states or inputs (saturation, safety bounds)?
-- **Performance requirements** — bandwidth, settling time, overshoot, disturbance rejection, robustness constraints
-- **Model uncertainty** — how confident is the plant model? Are there significant unmodelled dynamics?
+- **Linear or nonlinear** — does superposition hold? Does gain change with operating point?
+- **Inputs and outputs** — what actuator signals go in, what sensor signals come out?
+- **States** — what internal variables describe the system's memory?
+- **Dominant dynamics** — what order? Which modes matter for control?
+- **Block diagram** — signal flow: plant, sensor, controller, actuator, disturbance paths
 
-Do not proceed until the plant is sufficiently characterised.
+For deriving plant equations from physics:
+- Read `knowledge/control-theory/first-principles-modelling.md` — Newton/Euler-Lagrange pipelines
+- Read `knowledge/control-theory/state-space.md` — for state-space form conversion
 
-## Step 2 — Survey Available Controllers
+If the user's plant resembles a known example, point them to:
+- `knowledge/control-theory/examples/` — quarter-car, inverted pendulum, mass-spring-damper
 
-Read `knowledge/control-theory/controllers/index.md` to see the current controller catalogue. Also read `knowledge/control-theory/controllers/comparison.md` for the comparison table and decision tree.
+## Step 3 — Assess Controllability and Observability
+
+Before choosing a controller, verify that control is possible with the available hardware.
+
+- **Controllability:** Can the available actuators drive all relevant states?
+- **Observability:** Can the available sensors reconstruct the internal states? If not, an observer is needed.
+- **What's missing?** If a state is uncontrollable or unobservable, the design must add hardware or accept the limitation.
+
+Read `knowledge/control-theory/state-space.md` for the formal C/O rank tests.
+
+## Step 4 — Choose Control Architecture
+
+Read `knowledge/control-theory/controllers/index.md` to see the current controller catalogue. Read `knowledge/control-theory/controllers/comparison.md` for the comparison table and decision tree.
 
 As of writing:
 
@@ -34,12 +73,14 @@ As of writing:
 | LQG | `knowledge/control-theory/controllers/lqg.md` | — |
 | H-infinity | `knowledge/control-theory/controllers/h-infinity.md` | — |
 | SMC | `knowledge/control-theory/controllers/sliding-mode.md` | `reference/controllers/smc.h` |
+| Gain Scheduling | `knowledge/control-theory/controllers/gain-scheduling.md` | — |
+| MPC | `knowledge/control-theory/controllers/mpc.md` | — |
 
 Always read the index at runtime — new controllers may have been added.
 
-## Step 3 — Apply the Decision Tree
+### Decision Tree
 
-Use the selection decision tree from `comparison.md` to narrow candidates. Key branching questions:
+Use the selection decision tree from `comparison.md`. Key branching questions:
 
 1. **Is the plant linear?** If no → consider SMC or gain-scheduling.
 2. **Are all states measurable?** If no → need an observer → LQG, or output feedback → H-infinity.
@@ -47,14 +88,12 @@ Use the selection decision tree from `comparison.md` to narrow candidates. Key b
 4. **Is robustness to model uncertainty the primary concern?** If yes → SMC or H-infinity.
 5. **Is the system SISO or MIMO?** SISO with simple dynamics favours PID; MIMO favours LQR/LQG/MPC.
 
-Navigate the tree based on the plant characterisation from Step 1.
+### Evaluate Candidates
 
-## Step 4 — Evaluate Candidates
+For each candidate remaining after the decision tree, read its knowledge file and extract:
 
-For each candidate controller remaining after the decision tree, read its knowledge file and extract:
-
-- **Applicability** — what plant types it suits (from the knowledge file body)
-- **Prerequisites** — the `requires` field in YAML frontmatter (e.g. state-space model, stability analysis)
+- **Applicability** — what plant types it suits
+- **Prerequisites** — the `requires` field in YAML frontmatter
 - **Trade-offs** — complexity, tuning difficulty, optimality guarantees, robustness margins
 - **Related topics** — the `related` field pointing to supporting knowledge
 
@@ -64,65 +103,66 @@ Read prerequisite knowledge files as needed:
 - `knowledge/control-theory/frequency-response.md` — for frequency-domain design methods
 - `knowledge/control-theory/observers/kalman-filter.md` — if LQG is a candidate
 
-## Step 5 — Recommend with Rationale
+### Present the Recommendation
 
-Present a recommendation structured as:
+Structure as:
 
-1. **Recommended controller** and why it fits this plant
+1. **Recommended controller** and why it fits this plant (grounded in Steps 1-3)
 2. **Key trade-offs** vs the alternatives considered
-3. **Prerequisites the user needs** — cite the `requires` frontmatter entries and link to their knowledge files
-4. **Reference implementation** — point to the `.h` file if one exists (e.g. `reference/controllers/pid.h`)
+3. **Prerequisites the user needs** — cite the `requires` frontmatter entries
+4. **Reference implementation** — point to the `.h` file if one exists
 
-Every claim must cite a specific knowledge file path. If the knowledge base does not cover something, say so explicitly rather than filling the gap.
-
-## Step 6 — Nonlinear Systems
+### Nonlinear Systems
 
 If the user's plant is nonlinear:
 
 - **First consider SMC** — it handles nonlinear plants directly without linearization. Read `knowledge/control-theory/controllers/sliding-mode.md` for applicability.
-- If SMC is not suitable (e.g., actuator bandwidth is insufficient, unmatched disturbances dominate, or optimality is needed), discuss linearization around an operating point and whether PID/LQR remains valid within the expected operating envelope.
+- If SMC is not suitable (e.g., actuator bandwidth insufficient, unmatched disturbances dominate, optimality needed), discuss linearization and whether PID/LQR remains valid within the expected operating envelope.
 - For plants with varying operating points: discuss gain-scheduled PID or gain-scheduled LQR.
-- Check which controller's knowledge file addresses nonlinear applicability.
 
-### SMC Selection Criteria
+**SMC selection criteria:**
+- Recommend when: nonlinear plant + robustness primary + matched disturbances + sufficient actuator bandwidth
+- Avoid when: well-modelled linear plant, limited actuator bandwidth, optimality is primary concern, unmatched disturbances
 
-Recommend SMC when:
-- Plant is nonlinear AND robustness is the primary design goal
-- Matched disturbances dominate AND actuator bandwidth is sufficient for switching
-- Finite-time convergence is required
-- A disturbance bound is known or can be estimated
+**LQG selection criteria:**
+- Recommend when: linear plant + not all states measured + noise known + robustness margins not primary
+- Avoid when: all states measurable (use LQR), must guarantee margins (use H-infinity), highly nonlinear
 
-Prefer PID or LQR over SMC when:
-- Plant is well-modelled and linear (simpler design, optimality guarantees with LQR)
-- Actuator bandwidth is limited (chattering cannot be adequately suppressed)
-- Optimality is the primary concern (use LQR)
-- Unmatched disturbances dominate (SMC does not reject these)
+**H-infinity selection criteria:**
+- Recommend when: significant bounded uncertainty + must guarantee performance + output feedback + robustness critical
+- Avoid when: well-modelled plant (LQR simpler), no synthesis tools available, SISO with simple dynamics
 
-### LQG Selection Criteria
+## Step 5 — Address the Hard Parts
 
-Recommend LQG when:
-- Plant is linear and well-modelled
-- Not all states are directly measurable (observer needed)
-- Noise characteristics are reasonably known
-- Robustness margins are not the primary concern
+After selecting the architecture, proactively identify what will go wrong in practice. Walk through:
 
-Avoid LQG when:
-- All states are measurable (use LQR directly — better robustness)
-- Must guarantee robustness margins (LQG has none — consider H-infinity or LQG/LTR)
-- Plant is highly nonlinear (separation principle does not apply)
+| Hard part | Questions to raise |
+|---|---|
+| Nonlinearity | Does the plant gain change across the operating envelope? Where does linearisation break down? |
+| Disturbances | What external forces act on the system? Measurable (feedforward) or not? |
+| Noise | How noisy are the sensors? Does the derivative term amplify noise? Filtering needed? |
+| Actuator saturation | What happens when the controller output exceeds actuator limits? Anti-windup strategy? |
+| Time delays | Transport delay in actuator or sensor path? Impact on stability margins? |
+| Model uncertainty | How confident is the plant model? Unmodelled dynamics? Required gain/phase margin? |
+| Mode switching | Multiple operating modes? Smooth transitions? Bumpless transfer? |
 
-### H-infinity Selection Criteria
+If the user's problem resembles a known design problem, point them to the worked examples:
+- `knowledge/control-theory/design-problems/traction-control.md` — nonlinear tyre, surface estimation, split-mu
+- `knowledge/control-theory/design-problems/active-suspension.md` — semi-active constraint, skyhook, mode switching
+- `knowledge/control-theory/design-problems/hybrid-torque-split.md` — optimisation-based split, torque fill, thermal derating
 
-Recommend H-infinity when:
-- Plant model has significant, bounded uncertainty
-- Must guarantee performance across an operating range
-- Output feedback is required (not all states measured) AND robustness is critical
-- LQG margins are insufficient for the application
+## Step 6 — Validation Strategy
 
-Avoid H-infinity when:
-- Plant is well-modelled with low uncertainty (LQR/LQG is simpler, less conservative)
-- Computational tools for synthesis are unavailable
-- Plant is SISO with simple dynamics (loop-shaping PID is sufficient)
+Help the user define a testing pipeline:
+
+| Stage | Catches |
+|---|---|
+| **MIL** (Model-in-the-Loop) | Algorithm bugs, tuning errors, stability issues |
+| **SIL** (Software-in-the-Loop) | Fixed-point effects, timing, code correctness |
+| **HIL** (Hardware-in-the-Loop) | Actuator dynamics, communication latency, sensor noise |
+| **Hardware testing** | Real-world disturbances, edge cases, subjective evaluation |
+
+Define pass/fail criteria derived from the requirements in Step 1: settling time, overshoot, steady-state error, stability margins, disturbance rejection, actuator effort.
 
 ## Step 7 — Walk Through the Implementation
 
@@ -137,16 +177,24 @@ Offer to:
 ```
 knowledge/index.md
   → knowledge/control-theory/index.md
+    → knowledge/control-theory/design-framework.md              ← 6-STEP METHODOLOGY
     → knowledge/control-theory/controllers/index.md
-      → knowledge/control-theory/controllers/comparison.md    ← START HERE for selection
+      → knowledge/control-theory/controllers/comparison.md      ← SELECTION GUIDE (Step 4)
       → knowledge/control-theory/controllers/pid.md
       → knowledge/control-theory/controllers/lqr.md
       → knowledge/control-theory/controllers/lqg.md
       → knowledge/control-theory/controllers/h-infinity.md
       → knowledge/control-theory/controllers/sliding-mode.md
+      → knowledge/control-theory/controllers/gain-scheduling.md
+      → knowledge/control-theory/controllers/mpc.md
+    → knowledge/control-theory/design-problems/                 ← WORKED EXAMPLES
+      → traction-control.md
+      → active-suspension.md
+      → hybrid-torque-split.md
     → knowledge/control-theory/state-space.md
     → knowledge/control-theory/stability.md
     → knowledge/control-theory/frequency-response.md
+    → knowledge/control-theory/first-principles-modelling.md
     → knowledge/control-theory/observers/kalman-filter.md
 ```
 
@@ -156,5 +204,6 @@ knowledge/index.md
 - If the knowledge base lacks coverage for the user's scenario, say so.
 - Read files at runtime — do not assume content matches what was true when this skill was written.
 - Prefer the simplest controller that meets requirements. Do not recommend LQR when PID suffices.
-- Always start with the comparison table and decision tree before deep-diving into individual controllers.
+- Always follow the 6-step sequence. Do not jump to controller selection without requirements and plant characterisation.
+- When the user's problem resembles a worked design problem, reference it for structure and domain-specific insights.
 - Cite the specific knowledge file path for every technical claim.

@@ -11,6 +11,8 @@ related:
   - lqg.md
   - comparison.md
   - ../observers/kalman-filter.md
+  - ../examples/inverted-pendulum-cart.md
+  - ../design-problems/active-suspension.md
 reference: ../../../reference/controllers/lqr.h
 ---
 

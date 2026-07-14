@@ -10,6 +10,7 @@ requires:
 related:
   - pid.md
   - lqr.md
+  - ../design-problems/traction-control.md
 reference: ../../../reference/controllers/smc.h
 ---
 

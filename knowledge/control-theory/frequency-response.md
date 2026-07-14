@@ -14,6 +14,8 @@ related:
   - nyquist.md
   - root-locus.md
   - compensator-design.md
+  - first-principles-modelling.md
+  - ../math/transforms/laplace.md
 reference: projects/bode-explorer/transfer_function.h
 ---
 
@@ -259,6 +261,76 @@ angle(e^{-jwT}) = -wT   (radians, linear with frequency)
 - If delay is fixed, there is a maximum achievable bandwidth: w_c_max ≈ 0.5 / T
 - For a 1 kHz control loop (T_s = 1 ms): w_c_max ≈ 500 rad/s — usually fine
 - For a 100 Hz loop (T_s = 10 ms): w_c_max ≈ 50 rad/s — may limit performance
+
+## Deriving Transfer Functions from ODEs via Laplace
+
+The Laplace transform bridges the gap between physical modelling (ODEs from Newton/Euler-Lagrange) and frequency-domain analysis (Bode, Nyquist). The process is mechanical:
+
+### The Pipeline
+
+```
+Coupled ODEs (from Newton/E-L)
+  -> Laplace transform (assume zero ICs)
+  -> Algebraic equations in s
+  -> Solve for G(s) = Output(s) / Input(s)
+  -> Factor into pole-zero form for Bode analysis
+```
+
+### SISO: Direct Rearrangement
+
+For a single ODE, substitute x_dot -> s*X(s), x_ddot -> s^2*X(s), then solve:
+
+```
+Example: m*x_ddot + c*x_dot + k*x = F(t)
+
+Laplace:  (m*s^2 + c*s + k)*X(s) = F(s)
+
+G(s) = X(s)/F(s) = 1 / (m*s^2 + c*s + k)
+
+Factored: G(s) = (1/k) / (1 + (c/k)*s + (m/k)*s^2)
+        = (1/k) / (1 + 2*zeta*s/w_n + s^2/w_n^2)
+
+where w_n = sqrt(k/m), zeta = c / (2*sqrt(k*m))
+```
+
+The factored form maps directly to the complex pole pair element in the Bode building blocks table above.
+
+### Multi-DOF: Impedance Matrix Approach
+
+For an n-DOF system, taking Laplace of each Newton equation gives n algebraic equations. Arrange them into matrix form:
+
+```
+Z(s) * X(s) = F(s)
+```
+
+where Z(s) is the n x n **impedance matrix** (polynomial entries in s). Transfer functions are obtained via Cramer's rule or matrix inversion:
+
+```
+X_i(s)/F_j(s) = cofactor(Z, j, i) / det(Z)
+```
+
+The denominator det(Z) is the characteristic polynomial -- its roots are the system's poles (natural frequencies). For the complete 2-DOF derivation, see [examples/double-mass-spring-damper.md](examples/double-mass-spring-damper.md).
+
+### From State-Space to Transfer Function
+
+Given x_dot = Ax + Bu, y = Cx + Du, the transfer function is:
+
+```
+G(s) = C * (s*I - A)^{-1} * B + D
+```
+
+**Key fact:** The poles of G(s) are the eigenvalues of A. The denominator of the transfer function is det(s*I - A), the characteristic polynomial of A. This means eigenvalue analysis and pole analysis are two views of the same physics.
+
+### When to Use Which
+
+| Approach | Best for |
+|---|---|
+| Laplace / transfer function | SISO frequency analysis, Bode/Nyquist, classical compensator design, root locus |
+| State-space | MIMO systems, simulation (numerical integration), observer design, LQR/LQG |
+
+In practice, you often derive both: state-space for simulation and modern control, transfer function for frequency-domain design and stability margin analysis.
+
+For the complete Laplace transform reference (pairs table, properties, partial fractions), see [Laplace Transform](../math/transforms/laplace.md).
 
 ## Practical Notes
 

@@ -145,3 +145,34 @@ add_executable(test_tyre_model
 )
 target_include_directories(test_tyre_model PRIVATE vehicle-dynamics)
 add_test(NAME tyre_model COMMAND test_tyre_model)
+
+# --- Models: Double Mass-Spring-Damper ---
+add_executable(test_double_mass
+    models/double_mass_spring_damper.cpp
+    integrators/rk4.cpp
+    models/test_double_mass.cpp
+)
+target_include_directories(test_double_mass PRIVATE models integrators)
+target_link_libraries(test_double_mass PRIVATE Eigen3::Eigen)
+add_test(NAME double_mass COMMAND test_double_mass)
+
+# --- Models: Quarter-Car ---
+add_executable(test_quarter_car
+    models/quarter_car.cpp
+    integrators/rk4.cpp
+    models/test_quarter_car.cpp
+)
+target_include_directories(test_quarter_car PRIVATE models integrators)
+target_link_libraries(test_quarter_car PRIVATE Eigen3::Eigen)
+add_test(NAME quarter_car COMMAND test_quarter_car)
+
+# --- Models: Inverted Pendulum ---
+add_executable(test_inverted_pendulum
+    models/inverted_pendulum.cpp
+    controllers/lqr.cpp
+    integrators/rk4.cpp
+    models/test_inverted_pendulum.cpp
+)
+target_include_directories(test_inverted_pendulum PRIVATE models controllers integrators)
+target_link_libraries(test_inverted_pendulum PRIVATE Eigen3::Eigen)
+add_test(NAME inverted_pendulum COMMAND test_inverted_pendulum)

@@ -9,6 +9,7 @@ related:
   - bicycle-model.md
   - understeer-oversteer.md
   - vehicle-control-systems.md
+  - ../control-theory/design-problems/active-suspension.md
 ---
 
 # Weight Transfer — Load Redistribution Under Acceleration

@@ -9,6 +9,7 @@ requires:
 related:
   - vehicle-control-systems.md
   - ../control-theory/controllers/mpc.md
+  - ../control-theory/design-problems/hybrid-torque-split.md
 ---
 
 # Hybrid Powertrain — Energy Management and Torque Split
@@ -163,14 +164,31 @@ Objective: maximise T_regen (energy recovery) while maintaining:
 
 Modern F1 Energy Recovery Systems as an extreme example of hybrid energy management:
 
-| Component | Energy per Lap | Power |
-|---|---|---|
-| MGU-K recovery (braking) | 2 MJ | 120 kW |
-| MGU-K deployment (acceleration) | 4 MJ | 120 kW |
-| MGU-H (turbo heat recovery) | Unlimited | Unlimited |
-| Energy store (battery) | 4 MJ max capacity | — |
+| Component | Energy Limit | Power | Notes |
+|---|---|---|---|
+| MGU-K recovery | 2 MJ/lap | 120 kW | Braking energy → electrical |
+| MGU-K deployment | 4 MJ/lap | 120 kW (~160 hp, ~33s/lap) | Electrical → rear wheels |
+| MGU-H | Unlimited | Unlimited | Exhaust energy, eliminates turbo lag |
+| Energy Store | 4 MJ usable | — | Battery buffer (~20 kg) |
 
-The extra 2 MJ deployed vs recovered comes from MGU-H harvesting exhaust energy. The strategy layer decides WHEN to deploy the 120 kW boost (corners exit, overtaking zones) — a constrained optimisation problem solved lap-by-lap.
+The extra 2 MJ deployed vs recovered comes from MGU-H harvesting exhaust energy. The strategy layer decides WHEN to deploy the 120 kW boost (corner exits, overtaking zones) — a constrained optimisation problem solved lap-by-lap.
+
+### Control Problem Framing
+
+The ERS is an optimal energy management problem under real-time constraints:
+
+**Harvest decisions:** when to recover energy from braking (MGU-K) and exhaust heat (MGU-H), balancing energy capture against:
+- Tyre/brake interaction during MGU-K harvesting (regen torque affects brake balance)
+- Battery thermal limits (charge rate bounded by cell temperature)
+
+**Deployment decisions:** when to release the 120 kW boost, bounded by:
+- 4 MJ per-lap deployment limit (budget ~33 seconds of boost per lap)
+- Battery SoC constraints (cannot deploy below minimum charge)
+- Lap-by-lap strategy optimisation (different circuits have different optimal deployment maps)
+
+This maps directly to the same ECMS / MPC frameworks used in road-car hybrids (see above), but with much tighter constraints and higher stakes.
+
+> **Note:** MGU-H removed from 2026 F1 regulations. The 2026 power unit increases MGU-K power to 350 kW and removes the MGU-H entirely, shifting the harvesting burden fully to braking energy recovery.
 
 ## Mode Switching and Drivability
 

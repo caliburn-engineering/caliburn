@@ -11,6 +11,7 @@ related:
   - ../steady-state-error.md
   - ../second-order-systems.md
   - ../frequency-response.md
+  - ../design-problems/traction-control.md
 reference: ../../../reference/controllers/pid.h
 ---
 

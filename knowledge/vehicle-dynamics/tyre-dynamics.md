@@ -8,6 +8,7 @@ related:
   - bicycle-model.md
   - ../control-theory/controllers/sliding-mode.md
   - ../control-theory/controllers/pid.md
+  - ../control-theory/design-problems/traction-control.md
 ---
 
 # Tyre Dynamics — Force, Slip, and the Traction Circle

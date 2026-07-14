@@ -12,6 +12,10 @@ related:
   - ../control-theory/controllers/pid.md
   - ../control-theory/controllers/lqr.md
   - ../control-theory/controllers/sliding-mode.md
+  - ../control-theory/examples/quarter-car-model.md
+  - ../control-theory/design-problems/traction-control.md
+  - ../control-theory/design-problems/active-suspension.md
+  - ../control-theory/design-problems/hybrid-torque-split.md
 ---
 
 # Vehicle Control Systems — A Map of Automotive Control Engineering

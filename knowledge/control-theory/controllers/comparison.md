@@ -11,6 +11,7 @@ requires:
 related:
   - ../stability.md
   - ../frequency-response.md
+  - ../design-framework.md
   - lqg.md
   - h-infinity.md
 ---
@@ -64,3 +65,13 @@ The decision tree biases toward complexity. Counter-balance with this heuristic:
 > **Always prefer the simplest controller that meets requirements.** If PID works with adequate margins, do not reach for LQR. If LQR works without an observer, do not reach for LQG.
 
 Complexity costs: implementation effort, debugging difficulty, more failure modes, harder certification.
+
+## Full Design Methodology
+
+Controller selection (this file) is Step 4 of the broader [6-step control design framework](../design-framework.md). The framework adds upstream steps (requirements clarification, plant modelling, controllability/observability assessment) and downstream steps (addressing hard parts, validation strategy) that surround the architecture choice.
+
+For worked examples applying the full framework to automotive problems, see:
+
+- [Traction Control](../design-problems/traction-control.md) — nonlinear tyre curve, gain-scheduled/SMC architecture
+- [Active Suspension](../design-problems/active-suspension.md) — semi-active constraint, skyhook damping
+- [Hybrid Torque Split](../design-problems/hybrid-torque-split.md) — optimisation-based energy management

@@ -11,6 +11,7 @@ related:
   - gain-scheduling.md
   - comparison.md
   - ../trajectory-planning.md
+  - ../design-problems/hybrid-torque-split.md
 ---
 
 # Model Predictive Control (MPC)

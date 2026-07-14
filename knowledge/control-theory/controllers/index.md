@@ -14,3 +14,7 @@ Feedback control algorithms — from classical PID to optimal LQR, observer-base
 | [Gain Scheduling](gain-scheduling.md) | Practical nonlinear control via interpolated linear designs |
 | [MPC](mpc.md) | Constrained receding-horizon optimal control |
 | [Controller Selection Guide](comparison.md) | Comparison table and decision tree for choosing between all methods |
+
+## Design Methodology
+
+Controller selection is Step 4 of the [6-step control design framework](../design-framework.md). For worked examples applying the full framework to automotive problems, see the [design problems](../design-problems/) directory.
