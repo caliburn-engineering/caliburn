@@ -83,6 +83,12 @@ Create `src/visualizer.cpp` with the full main loop. Every viewer must include t
 
 Every time series plot must follow these rules:
 
+**Grouping: one plot per state type**
+- Group signals by physical type, not by individual state. States that share the same unit and meaning go in one plot. Examples: all positions in one plot, all velocities in one plot, all angles in one plot.
+- Good: "Position [m]" with traces x, y. "Velocity [m/s]" with traces vx, vy. "Servo Angles [deg]" with traces α₀, α₁, α₂.
+- Bad: separate plots for x position and y position. Separate plots for each servo angle.
+- When comparing models (e.g. linear vs nonlinear), both model traces for each state appear in the same state-type plot. Use solid lines for one model and dashed for the other, or distinct color families (blue/orange for model A, green/red for model B).
+
 **Layout**
 - Plots auto-size their height to divide available vertical space evenly, with a minimum height of 120 pixels per plot. If the available space cannot fit all plots at minimum height, the panel becomes scrollable.
 - **Plot visibility toggles**: a row of toggle buttons at the top of the plots panel, one per plot, labelled with the plot title. Clicking a button hides/shows that plot. Hidden plots free their vertical space for visible ones. The height calculation and scrolling logic use only the count of visible plots.
