@@ -176,3 +176,12 @@ add_executable(test_inverted_pendulum
 target_include_directories(test_inverted_pendulum PRIVATE models controllers integrators)
 target_link_libraries(test_inverted_pendulum PRIVATE Eigen3::Eigen)
 add_test(NAME inverted_pendulum COMMAND test_inverted_pendulum)
+
+# --- Models: Linearizer ---
+add_executable(test_linearizer
+    models/linearizer.cpp
+    models/test_linearizer.cpp
+)
+target_include_directories(test_linearizer PRIVATE models)
+target_link_libraries(test_linearizer PRIVATE Eigen3::Eigen)
+add_test(NAME linearizer COMMAND test_linearizer)
