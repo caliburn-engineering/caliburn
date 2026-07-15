@@ -26,3 +26,4 @@ Feedback control, state estimation, and stability analysis.
 | [Root Locus Method](root-locus.md) | How closed-loop poles move with gain, essential construction rules |
 | [First-Principles Modelling](first-principles-modelling.md) | Newton & Euler-Lagrange derivation pipelines, 3-minute checklist, state-space assembly pattern |
 | [Control Design Framework](design-framework.md) | 6-step methodology for any control design problem: requirements, modelling, C/O assessment, architecture, hard parts, validation |
+| [Linearization](linearization.md) | Jacobian linearization, small-signal validity, numerical vs analytical, worked ball-on-plate example |
