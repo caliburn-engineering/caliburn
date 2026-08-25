@@ -26,3 +26,17 @@ When the user asks to work on a project in `projects/`:
 1. Read that project's `AGENTS.md` first
 2. Use knowledge files and reference implementations as needed
 3. Stay in the project context unless the user asks to switch
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `caliburn-engineering/caliburn`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
