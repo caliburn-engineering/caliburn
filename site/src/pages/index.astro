@@ -1,0 +1,88 @@
+---
+const demo = '/demo/linear-analyzer/visualizer.html';
+---
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Caliburn — Control Engineering in the Browser</title>
+  <meta name="description" content="Interactive control-systems tooling compiled to WebAssembly. Linear system analysis, controller design, and nonlinear simulation." />
+  <style>
+    :root {
+      --bg: #14141a; --panel: #1c1c26; --line: #2a2a3a;
+      --fg: #e0e0f0; --muted: #a0a0b0; --accent: #38bdf8;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.65; -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 60rem; margin: 0 auto; padding: 0 1.5rem; }
+    header { padding: 4rem 0 2.5rem; }
+    h1 { font-size: clamp(1.9rem, 5vw, 2.8rem); line-height: 1.15; letter-spacing: -0.02em; }
+    h1 .accent { color: var(--accent); }
+    .lede { color: var(--muted); font-size: 1.1rem; margin-top: 1rem; max-width: 44rem; }
+    h2 { font-size: 1.25rem; margin-bottom: .75rem; letter-spacing: -0.01em; }
+    p + p { margin-top: .9rem; }
+    section { padding: 2.5rem 0; border-top: 1px solid var(--line); }
+    .frame {
+      border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+      background: #000; aspect-ratio: 16 / 10; min-height: 24rem;
+    }
+    .frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .frame-note {
+      display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+      margin-top: .7rem; font-size: .85rem; color: var(--muted);
+    }
+    a { color: var(--accent); }
+    ul { margin-top: .6rem; padding-left: 1.1rem; color: var(--muted); }
+    li { margin-bottom: .35rem; }
+    li strong { color: var(--fg); font-weight: 600; }
+    footer { padding: 3rem 0 4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Control engineering,<br /><span class="accent">running in your browser.</span></h1>
+      <p class="lede">
+        C++ and Eigen compiled to WebAssembly. Build a plant model, design a
+        controller against it, and watch the poles move as you tune — no MATLAB,
+        no install, no account.
+      </p>
+    </header>
+
+    <section>
+      <h2>Linear System Analyzer</h2>
+      <p>
+        Pick a plant, close a loop around it, and read the consequences off four
+        synchronised views. Everything below is live — the same code that runs on
+        the desktop, compiled to wasm.
+      </p>
+      <div class="frame" style="margin-top: 1.25rem;">
+        <iframe src={demo} title="Linear System Analyzer" loading="lazy"></iframe>
+      </div>
+      <div class="frame-note">
+        <span>Drag the sliders in the Model panel. The Bode, Nyquist, pole-zero and step-response views update together.</span>
+        <a href={demo} target="_blank" rel="noopener">Open fullscreen &rarr;</a>
+      </div>
+    </section>
+
+    <section>
+      <h2>What you are looking at</h2>
+      <ul>
+        <li><strong>Model panel</strong> — state-space plant, editable in place. Presets include a DC motor, a mass-spring-damper, and the ball-on-plate rig.</li>
+        <li><strong>Loop pairing</strong> — for multi-input plants, an RGA grid showing which input should drive which output, and which channels are structurally dead.</li>
+        <li><strong>Controllers</strong> — PID and lead/lag today, state feedback next.</li>
+        <li><strong>Frequency and time views</strong> — Bode, Nyquist, pole-zero map and step response, all driven off one shared model.</li>
+      </ul>
+    </section>
+
+    <footer class="wrap" style="padding-left:0; padding-right:0;">
+      Built with Caliburn — an open engineering workspace.
+      <a href="https://github.com/caliburn-engineering/caliburn">Source on GitHub</a>.
+    </footer>
+  </div>
+</body>
+</html>

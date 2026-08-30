@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+.wrangler/
+
+# Compiled Emscripten bundles — build output, not source.
+# Regenerate with `npm run sync:demo` (needs the project build tree + emsdk).
+public/demo/
