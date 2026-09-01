@@ -47,6 +47,7 @@ const analyzer = '/demo/linear-analyzer/visualizer.html';
       width: min(84rem, calc(100vw - 3rem));
     }
     .frame {
+      margin-top: 1.25rem;
       border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
       background: #000; height: min(64vh, 38rem); min-height: 24rem;
     }
@@ -92,7 +93,7 @@ const analyzer = '/demo/linear-analyzer/visualizer.html';
         dynamics. It opens with the loop already closed and the ball already
         tracing a circle, so there is nothing to press to see it work.
       </p>
-      <div class="frame lead" style="margin-top: 1.25rem;">
+      <div class="frame lead">
         <iframe src={ballBalancer} title="Ball-Balancer" allow="autoplay"></iframe>
       </div>
       <div class="frame-note">
@@ -161,7 +162,7 @@ const analyzer = '/demo/linear-analyzer/visualizer.html';
         full application, and because keeping it live means this page always has
         something working on it.
       </p>
-      <div class="frame" style="margin-top: 1.25rem;">
+      <div class="frame">
         <iframe src={analyzer} title="Linear System Analyzer" loading="lazy"></iframe>
       </div>
       <div class="frame-note">
