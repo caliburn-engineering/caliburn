@@ -12,16 +12,17 @@ cd "$(dirname "$0")"
 
 # The published demos, as "<demo path>:<project directory it is built in>".
 #
-# The two names differ for Ball-Balancer: it is built in the linear-analyzer
-# project, because that repository is the survivor of the merge and the rename
-# is sequenced after the deploy.  Mapping each project onto a demo path of its
-# own name — which is what this script used to do — therefore published
-# Ball-Balancer *as* the analyzer and destroyed the analyzer bundle doing it.
+# The two agree again since the rename in #20, but the pair is still written out
+# rather than inferred. Inferring it is what this script used to do, and while
+# the merged application was still built in the linear-analyzer project that
+# published Ball-Balancer *as* the analyzer and destroyed the analyzer bundle
+# doing it. The names can drift apart again; the guard should not depend on
+# their agreeing.
 #
-# A demo path absent from this list is never written to.  demo/linear-analyzer
-# is absent deliberately: it holds the frozen analyzer-only bundle, which the
-# merge removed the build path for and no build tree can regenerate.
-DEMOS="ball-balancer:linear-analyzer"
+# A demo path absent from this list is never written to. demo/linear-analyzer is
+# absent deliberately: it holds the frozen analyzer-only bundle, which the merge
+# removed the build path for and no build tree can regenerate.
+DEMOS="ball-balancer:ball-balancer"
 
 for entry in $DEMOS; do
     demo=${entry%%:*}
