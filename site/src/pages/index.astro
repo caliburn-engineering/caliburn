@@ -1,12 +1,18 @@
 ---
-const demo = '/demo/linear-analyzer/visualizer.html';
+// Two demos, both published. Ball-Balancer is the merged application and leads
+// the page; the analyzer is the frozen standalone bundle kept live beneath it,
+// so the site is never without something working.
+const ballBalancer = '/demo/ball-balancer/visualizer.html';
+const analyzer = '/demo/linear-analyzer/visualizer.html';
 ---
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Caliburn — Control Engineering in the Browser</title>
-  <meta name="description" content="Interactive control-systems tooling compiled to WebAssembly. Linear system analysis, controller design, and nonlinear simulation." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="/favicon.ico" sizes="any" />
+  <meta name="description" content="Ball-Balancer: design a controller against a linearised model and watch it drive the real nonlinear plate. C++ and Eigen compiled to WebAssembly." />
   <style>
     :root {
       --bg: #14141a; --panel: #1c1c26; --line: #2a2a3a;
@@ -19,64 +25,149 @@ const demo = '/demo/linear-analyzer/visualizer.html';
       line-height: 1.65; -webkit-font-smoothing: antialiased;
     }
     .wrap { max-width: 60rem; margin: 0 auto; padding: 0 1.5rem; }
-    header { padding: 4rem 0 2.5rem; }
+    header { padding: 4rem 0 2rem; }
     h1 { font-size: clamp(1.9rem, 5vw, 2.8rem); line-height: 1.15; letter-spacing: -0.02em; }
     h1 .accent { color: var(--accent); }
     .lede { color: var(--muted); font-size: 1.1rem; margin-top: 1rem; max-width: 44rem; }
-    h2 { font-size: 1.25rem; margin-bottom: .75rem; letter-spacing: -0.01em; }
+    h2 { font-size: 1.25rem; letter-spacing: -0.01em; }
+    h2 .kicker {
+      display: block; font-size: .72rem; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: .35rem;
+    }
+    h3 { font-size: 1rem; margin-bottom: .4rem; }
     p + p { margin-top: .9rem; }
+    h2 + p { margin-top: .75rem; }
     section { padding: 2.5rem 0; border-top: 1px solid var(--line); }
+    section.hero { border-top: 0; padding-top: 0; }
+    /* The demos are full applications with a docking layout sized for a desktop
+       window. Inside a 60rem column they are legible only as a thumbnail, so
+       both frames break out of the prose measure and take the viewport. */
+    .frame, .frame-note {
+      position: relative; left: 50%; transform: translateX(-50%);
+      width: min(84rem, calc(100vw - 3rem));
+    }
     .frame {
       border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
-      background: #000; aspect-ratio: 16 / 10; min-height: 24rem;
+      background: #000; height: min(64vh, 38rem); min-height: 24rem;
     }
+    .frame.lead { height: min(80vh, 48rem); min-height: 30rem; }
     .frame iframe { width: 100%; height: 100%; border: 0; display: block; }
     .frame-note {
       display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
       margin-top: .7rem; font-size: .85rem; color: var(--muted);
     }
+    .frame-note a { white-space: nowrap; }
     a { color: var(--accent); }
     ul { margin-top: .6rem; padding-left: 1.1rem; color: var(--muted); }
     li { margin-bottom: .35rem; }
     li strong { color: var(--fg); font-weight: 600; }
+    .cards { display: grid; gap: 1.25rem; margin-top: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1.1rem 1.2rem; }
+    .card p { color: var(--muted); font-size: .92rem; }
     footer { padding: 3rem 0 4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+    @media (max-width: 40rem) {
+      header { padding-top: 2.5rem; }
+      /* A phone cannot show this layout legibly at any size — the frame is a
+         preview, and the fullscreen link beside it is the way in. */
+      .frame, .frame.lead { height: 70vh; min-height: 0; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <h1>Control engineering,<br /><span class="accent">running in your browser.</span></h1>
+      <h1>Design the controller,<br /><span class="accent">watch the real plant obey.</span></h1>
       <p class="lede">
-        C++ and Eigen compiled to WebAssembly. Build a plant model, design a
-        controller against it, and watch the poles move as you tune — no MATLAB,
-        no install, no account.
+        C++ and Eigen compiled to WebAssembly. A ball balances on a tilting
+        three-legged table while you tune the controller that holds it there —
+        no MATLAB, no install, no account.
       </p>
     </header>
 
-    <section>
-      <h2>Linear System Analyzer</h2>
+    <section class="hero">
+      <h2><span class="kicker">Primary demo</span>Ball-Balancer</h2>
       <p>
-        Pick a plant, close a loop around it, and read the consequences off four
-        synchronised views. Everything below is live — the same code that runs on
-        the desktop, compiled to wasm.
+        The plate is a 3-RRS parallel mechanism: three servo-driven legs under a
+        circular table, with a ball rolling on it under real rigid-body contact
+        dynamics. It opens with the loop already closed and the ball already
+        tracing a circle, so there is nothing to press to see it work.
       </p>
-      <div class="frame" style="margin-top: 1.25rem;">
-        <iframe src={demo} title="Linear System Analyzer" loading="lazy"></iframe>
+      <div class="frame lead" style="margin-top: 1.25rem;">
+        <iframe src={ballBalancer} title="Ball-Balancer" allow="autoplay"></iframe>
       </div>
       <div class="frame-note">
-        <span>Drag the sliders in the Model panel. The Bode, Nyquist, pole-zero and step-response views update together.</span>
-        <a href={demo} target="_blank" rel="noopener">Open fullscreen &rarr;</a>
+        <span>Takes a few seconds to load — it is fetching a 1.5 MB WebAssembly binary.
+          The layout wants a desktop-sized window: on a phone it loads and runs, but the panels are small.</span>
+        <a href={ballBalancer} target="_blank" rel="noopener">Open fullscreen &rarr;</a>
       </div>
     </section>
 
     <section>
       <h2>What you are looking at</h2>
-      <ul>
-        <li><strong>Model panel</strong> — state-space plant, editable in place. Presets include a DC motor, a mass-spring-damper, and the ball-on-plate rig.</li>
-        <li><strong>Loop pairing</strong> — for multi-input plants, an RGA grid showing which input should drive which output, and which channels are structurally dead.</li>
-        <li><strong>Controllers</strong> — PID and lead/lag today, state feedback next.</li>
-        <li><strong>Frequency and time views</strong> — Bode, Nyquist, pole-zero map and step response, all driven off one shared model.</li>
-      </ul>
+      <p>
+        The point of the application is the join between two halves that are each
+        only half a story: a linear design surface on the left, and the nonlinear
+        consequence of that design on the right, live and side by side.
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>The plate</h3>
+          <p>
+            The 3D view and <em>Plate Control</em>. Drag to orbit, scroll to zoom.
+            Nudge the ball and watch the loop reject the disturbance, or send it
+            round a square instead of a circle and watch it stumble at the corners.
+          </p>
+        </div>
+        <div class="card">
+          <h3>The design surface</h3>
+          <p>
+            <em>Model Configuration</em> holds the plate's linearised state-space
+            model and the controller designed against it — LQR state feedback, with
+            editable state and input weights, plus the analyzer's PID and lead/lag.
+          </p>
+        </div>
+        <div class="card">
+          <h3>The consequence</h3>
+          <p>
+            Bode, Nyquist, pole-zero and step response, all driven off that one
+            linearised model. Move the weights and the closed-loop poles move —
+            and so does the ball, in the same frame.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Where linear stops</h3>
+          <p>
+            The gain is designed against a linearisation; the plate simulated
+            beside it is not linear. Push the design hard enough and the servos
+            saturate, the ball overshoots, and the two stop agreeing. That gap is
+            the thing worth looking at.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="kicker">Also published</span>Linear System Analyzer</h2>
+      <p>
+        The frequency-domain half on its own, without the plate: pick a plant from
+        the presets — a DC motor, a mass-spring-damper, the ball-on-plate rig —
+        close a loop around it, and read the consequences off four synchronised
+        views. It also carries the loop-pairing tooling for multi-input plants: an
+        RGA grid showing which input should drive which output, and which channels
+        are structurally dead.
+      </p>
+      <p>
+        It stays published because it is a smaller, faster thing to open than the
+        full application, and because keeping it live means this page always has
+        something working on it.
+      </p>
+      <div class="frame" style="margin-top: 1.25rem;">
+        <iframe src={analyzer} title="Linear System Analyzer" loading="lazy"></iframe>
+      </div>
+      <div class="frame-note">
+        <span>Drag the sliders in the Model panel. The Bode, Nyquist, pole-zero and step-response views update together.</span>
+        <a href={analyzer} target="_blank" rel="noopener">Open fullscreen &rarr;</a>
+      </div>
     </section>
 
     <footer class="wrap" style="padding-left:0; padding-right:0;">

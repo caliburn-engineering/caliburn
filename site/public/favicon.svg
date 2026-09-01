@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#14141a"/>
+  <!-- the plate, tilted -->
+  <ellipse cx="32" cy="42" rx="24" ry="9" fill="none" stroke="#38bdf8" stroke-width="4"
+           transform="rotate(-14 32 42)"/>
+  <!-- the ball on it -->
+  <circle cx="41" cy="32" r="8" fill="#e0e0f0"/>
+</svg>

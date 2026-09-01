@@ -5,4 +5,12 @@ dist/
 
 # Compiled Emscripten bundles — build output, not source.
 # Regenerate with `npm run sync:demo` (needs the project build tree + emsdk).
-public/demo/
+public/demo/*
+
+# ...except the frozen linear-analyzer bundle. This one is tracked deliberately.
+# The merge that produced Ball-Balancer removed the analyzer-only build path, so
+# this bundle can no longer be rebuilt from source — it is the last copy. The
+# whole point of keeping both demos published is that the site is never without
+# something working, which only holds if this artifact survives a fresh clone.
+# It is frozen: nothing regenerates it, so it costs its ~2 MB exactly once.
+!public/demo/linear-analyzer/
