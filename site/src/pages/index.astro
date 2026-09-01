@@ -65,7 +65,15 @@ const analyzer = '/demo/linear-analyzer/visualizer.html';
     .cards { display: grid; gap: 1.25rem; margin-top: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
     .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1.1rem 1.2rem; }
     .card p { color: var(--muted); font-size: .92rem; }
-    footer { padding: 3rem 0 4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+    .byline { margin-top: 1.1rem; font-size: .95rem; color: var(--muted); }
+    .byline strong { color: var(--fg); font-weight: 600; }
+    footer { padding: 2.5rem 0 4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .92rem; }
+    footer h2 { font-size: 1.25rem; color: var(--fg); margin-bottom: .75rem; }
+    footer p { max-width: 44rem; }
+    footer p + p { margin-top: .9rem; }
+    footer .links { margin-top: 1.1rem; }
+    footer .links a { margin-right: .15rem; }
+    footer strong { color: var(--fg); font-weight: 600; }
     @media (max-width: 40rem) {
       header { padding-top: 2.5rem; }
       /* A phone cannot show this layout legibly at any size — the frame is a
@@ -82,6 +90,9 @@ const analyzer = '/demo/linear-analyzer/visualizer.html';
         C++ and Eigen compiled to WebAssembly. A ball balances on a tilting
         three-legged table while you tune the controller that holds it there —
         no MATLAB, no install, no account.
+      </p>
+      <p class="byline">
+        Built by <strong>Niklas Simonsen</strong>, mechatronics and control engineer.
       </p>
     </header>
 
@@ -172,8 +183,19 @@ const analyzer = '/demo/linear-analyzer/visualizer.html';
     </section>
 
     <footer class="wrap" style="padding-left:0; padding-right:0;">
-      Built with Caliburn — an open engineering workspace.
-      <a href="https://github.com/caliburn-engineering/caliburn">Source on GitHub</a>.
+      <h2>Who made this</h2>
+      <p>
+        <strong>Niklas Simonsen</strong> — mechatronics and control engineer. I build
+        control systems, and tools that make what they are doing visible. This page is
+        the second kind: the mathematics on the left is what the plate on the right is
+        actually obeying, and you can move one and watch the other answer.
+      </p>
+      <p>
+        <strong>Caliburn</strong> is the open engineering workspace it grew out of —
+        structured control-theory knowledge, tested C++ reference implementations, and
+        the projects built on top of them.
+      </p>
+      <p class="links"><a href="https://github.com/caliburn-engineering/caliburn">Caliburn on GitHub</a> &middot; <a href="https://github.com/caliburn-engineering/ball-balancer">Ball-Balancer source</a></p>
     </footer>
   </div>
 </body>
