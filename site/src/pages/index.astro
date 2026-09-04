@@ -2,6 +2,12 @@
 // Two demos, both published. Ball-Balancer is the merged application and leads
 // the page; the analyzer is the frozen standalone bundle kept live beneath it,
 // so the site is never without something working.
+//
+// They scale differently on a phone and the copy below says so (#25).
+// Ball-Balancer rebuilds from source, so its font atlas and style metrics are
+// baked at the device pixel ratio and it renders sharp. The analyzer cannot be
+// rebuilt, so its shell drops the canvas to 1:1 below 700px instead: correct
+// size, but upscaled and soft.
 const ballBalancer = '/demo/ball-balancer/visualizer.html';
 const analyzer = '/demo/linear-analyzer/visualizer.html';
 ---
@@ -109,7 +115,8 @@ const analyzer = '/demo/linear-analyzer/visualizer.html';
       </div>
       <div class="frame-note">
         <span>Takes a few seconds to load — it is fetching a 1.5 MB WebAssembly binary.
-          The layout wants a desktop-sized window: on a phone it loads and runs, but the panels are small.</span>
+          The interface scales to your screen's pixel density, so it reads on a phone; a
+          desktop-sized window still gives the panels considerably more room to work in.</span>
         <a href={ballBalancer} target="_blank" rel="noopener">Open fullscreen &rarr;</a>
       </div>
     </section>
@@ -177,7 +184,9 @@ const analyzer = '/demo/linear-analyzer/visualizer.html';
         <iframe src={analyzer} title="Linear System Analyzer" loading="lazy"></iframe>
       </div>
       <div class="frame-note">
-        <span>Drag the sliders in the Model panel. The Bode, Nyquist, pole-zero and step-response views update together.</span>
+        <span>Drag the sliders in the Model panel. The Bode, Nyquist, pole-zero and step-response
+          views update together. On a phone its text is legible but soft — this bundle is frozen at
+          the size it was built, so it is upscaled rather than re-rendered.</span>
         <a href={analyzer} target="_blank" rel="noopener">Open fullscreen &rarr;</a>
       </div>
     </section>
