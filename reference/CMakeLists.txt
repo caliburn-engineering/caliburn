@@ -17,6 +17,9 @@ set(EIGEN_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(eigen)
 
+# --- Test helpers (header-only, available to every test target) ---
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/test)
+
 enable_testing()
 
 # --- Integrators ---
@@ -185,3 +188,10 @@ add_executable(test_linearizer
 target_include_directories(test_linearizer PRIVATE models)
 target_link_libraries(test_linearizer PRIVATE Eigen3::Eigen)
 add_test(NAME linearizer COMMAND test_linearizer)
+
+# --- Assert-rel helpers ---
+add_executable(test_assert_rel
+    test/test_assert_rel.cpp
+)
+target_link_libraries(test_assert_rel PRIVATE Eigen3::Eigen)
+add_test(NAME assert_rel COMMAND test_assert_rel)
