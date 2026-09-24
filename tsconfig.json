@@ -13,6 +13,14 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["tools/**/*.ts", ".pi/**/*.ts"],
-  "exclude": ["node_modules", "dist", "projects"]
+  "include": [
+    "tools/**/*.ts",
+    ".pi/**/*.ts",
+    ".sandcastle/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "projects"
+  ]
 }

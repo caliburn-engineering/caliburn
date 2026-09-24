@@ -17,6 +17,13 @@ cmake-build-*/
 # Local-only skills (not version-controlled, not pushed to GitHub)
 .pi/skills/local-*/
 
+# Agent worktrees (Claude Code / Sandcastle manage their own)
+.claude/worktrees/
+
+# Astro's cache, written by a `preview` run from the wrong directory:
+# the site lives in site/, and this one has no src/pages at all.
+.astro/
+
 # IDE
 .vscode/
 .idea/

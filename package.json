@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "ingest": "tsx tools/rag/ingest.ts",
-    "ingest:dry": "tsx tools/rag/ingest.ts --dry-run"
+    "ingest:dry": "tsx tools/rag/ingest.ts --dry-run",
+    "sandcastle": "tsx .sandcastle/main.ts",
+    "sandcastle:smoke": "tsx .sandcastle/smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
@@ -14,6 +16,7 @@
     "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
+    "@ai-hero/sandcastle": "0.12.0",
     "@types/node": "^22.0.0",
     "@types/pdf-parse": "^1.1.4",
     "tsx": "^4.19.0",
