@@ -44,6 +44,9 @@ LqrResult dlqr(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     throw std::runtime_error("dlqr: DARE did not converge within max_iter iterations");
 }
 
+// AUDITED-AND-WEAKER (workstream 1): no CARE residual check, no U1 conditioning
+// guard, arbitrary stable-eigenvector selection. Do not build new golden-source
+// work against this function before workstream 5 resolves it. See issue #54.
 LqrResult lqr(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
               const Eigen::MatrixXd& Q, const Eigen::MatrixXd& R) {
     const int n = A.rows();
