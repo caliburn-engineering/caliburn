@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caliburn Factory Floor</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1><span class="mark"></span> Factory Floor</h1>
+  <nav role="tablist">
+    <button id="tab-runs" role="tab" aria-selected="true" aria-controls="view-runs">Runs</button>
+    <button id="tab-issues" role="tab" aria-selected="false" aria-controls="view-issues">Issues</button>
+  </nav>
+  <span class="spacer"></span>
+  <span class="meta"><span id="live"></span><span id="updated"></span></span>
+</header>
+
+<main>
+  <section id="view-runs" role="tabpanel">
+    <div class="runs-layout">
+      <div class="run-list" id="run-list"></div>
+      <div id="run-detail"></div>
+    </div>
+  </section>
+
+  <section id="view-issues" role="tabpanel" hidden>
+    <div id="issue-error"></div>
+    <div class="board" id="board"></div>
+  </section>
+</main>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

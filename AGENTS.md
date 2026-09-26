@@ -71,6 +71,53 @@ to run an agent unattended in a Docker container against `ready-for-agent` issue
 Launch with `npx tsx .sandcastle/main.ts`, or `work caliburn afk` for a tmux
 session with a live log tail that survives disconnects.
 
+### Watching runs — the Factory Floor
+
+`tools/factory/` is a local dashboard over AFK runs and the issue tracker.
+
+```bash
+npm run factory              # http://127.0.0.1:4600
+HOST=0.0.0.0 npm run factory # reachable from the phone over Tailscale
+```
+
+It reads `.sandcastle/logs/*.log` — the one artefact every run leaves behind —
+and re-parses the ones that grew every few seconds, so a run in flight shows up
+without any wiring in `main.ts`. Parsed traces land in `.sandcastle/logs/trace.db`
+(gitignored); the log file stays the source of truth, so deleting the db costs
+nothing.
+
+| Path | Purpose |
+|---|---|
+| `db.ts` | Schema and connection. Close to sssf.db's shape so either UI could read either db |
+| `ingest.ts` | Log grammar → runs, phases, events, skills; commits recovered from git by time window |
+| `issues.ts` | `gh issue list` mapped onto the five triage labels, plus an "in flight" column the tracker cannot know |
+| `server.ts` | JSON API + static UI, and the ingest loop |
+| `public/` | The UI: vanilla, no build step |
+
+Each run shows the ticket it is working — headline plus description, pulled from
+the tracker — and its **conclusion**: the comment it filed via `gh issue close`
+or `gh issue comment`, which is where `prompt.md` tells it to explain itself and
+therefore where a question back to a human lands. Its closing prose comes second,
+and a harness failure (a subscription rate limit, most often) outranks both and is
+labelled as such rather than passed off as a finished run.
+
+The issue number is recovered from the run name (`ticket-44`, `afk-39`), else the
+branch (`sc/44-guardrail`), else the first `gh issue view N` the agent runs — so
+any of the three naming habits works, but a trailing number is what makes it free.
+
+Below that sits the **live ticket thread**, pulled from GitHub for the selected
+run only. Two flags earn their place there: the comment this run filed (matched
+against the report in its own trace, because the agent posts under your token and
+the author name cannot tell you), and comments that arrived *after* the run
+stopped — a reply of yours, or a later run, that nothing has answered yet.
+
+The board reads `done` from GitHub state rather than a label, per
+`docs/agents/triage-labels.md`. An issue counts as **in flight** when a run whose
+status is still `running` names it.
+
+`*.console.log` files are skipped: they are orchestrator stdout, and a file with
+no run banner in it would otherwise be re-parsed on every tick.
+
 Two things worth knowing before you run it:
 
 - **`projects/` is gitignored**, so it is absent from any worktree-based run. To
