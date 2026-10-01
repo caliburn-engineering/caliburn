@@ -7,7 +7,7 @@ hold across every project; a project's own `CONTEXT.md` adds its domain on top.
 ## Workspace
 
 **Golden source**:
-The tested, standalone implementations in `reference/` that every project draws on, grown from the projects that first needed them.
+The tested, standalone implementations in `reference/` that projects read and copy from, grown from the projects that first needed them.
 _Avoid_: library, vendor code, shared code
 
 **Knowledge file**:
