@@ -26,6 +26,15 @@ const TICKETS: Record<number, { repo: "caliburn" | "bb"; slug: string }> = {
   42: { repo: "bb", slug: "stab" },
   43: { repo: "bb", slug: "oracle" },
   44: { repo: "bb", slug: "guardrail" },
+  45: { repo: "bb", slug: "care-hardening" },
+  46: { repo: "bb", slug: "guardrail-fixes" },
+  47: { repo: "bb", slug: "impulse" },
+  48: { repo: "bb", slug: "locus-labels" },
+  49: { repo: "bb", slug: "nyquist" },
+  50: { repo: "bb", slug: "fixture-compare" },
+  51: { repo: "bb", slug: "residual-gate" },
+  52: { repo: "bb", slug: "live-oracle" },
+  53: { repo: "bb", slug: "pydrake" },
 };
 
 const n = Number(process.argv[2]);
@@ -47,8 +56,10 @@ const isBB = meta.repo === "bb";
 // rather than the GL visualizer when GL is absent.
 const verify = isBB
   ? `Build and run the desktop test suite:
-    cmake -S . -B build && cmake --build build -j && ctest --test-dir build --output-on-failure
-  The first configure fetches Eigen and takes several minutes — do not abandon it.
+    cmake -S . -B build -DGLFW_BUILD_WAYLAND=OFF && cmake --build build -j && ctest --test-dir build --output-on-failure
+  The image has no Wayland dev libraries, hence -DGLFW_BUILD_WAYLAND=OFF (CI installs
+  them and needs no flag). The first configure fetches Eigen and takes several
+  minutes — do not abandon it.
   If the full build fails only because the GL 'visualizer' target needs a display
   library the container lacks, build and test the affected library and test
   targets instead (e.g. --target test_<name>) and say so in your issue comment.
