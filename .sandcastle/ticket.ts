@@ -36,7 +36,6 @@ const TICKETS: Record<number, { repo: "caliburn" | "bb"; slug: string }> = {
   52: { repo: "bb", slug: "live-oracle" },
   53: { repo: "bb", slug: "pydrake" },
   63: { repo: "bb", slug: "roundoff-robust" },
-  64: { repo: "bb", slug: "nominal-pumping" },
 };
 
 const n = Number(process.argv[2]);
