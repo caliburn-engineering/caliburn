@@ -332,11 +332,24 @@ void test_place_poles_hand_derived() {
         ASSERT_REL_NEAR(L(1), 13.0, 1e-13);
     }
 
+    // Case 3: one unstable pole, p1=+1, p2=−3, so the polynomial has a negative
+    // coefficient (s−1)(s+3) = s² + 2s − 3. With stable poles every coefficient is
+    // positive, so sign errors on the coefficients would go unseen.
+    // l1 = −(1 + −3) = 2,  l2 = (1)·(−3) = −3
+    {
+        Eigen::VectorXcd poles(2);
+        poles << std::complex<double>( 1.0, 0.0),
+                 std::complex<double>(-3.0, 0.0);
+        Eigen::VectorXd L = caliburn::placeObserverPoles(A, C, poles);
+        ASSERT_REL_NEAR(L(0),  2.0, 1e-13);
+        ASSERT_REL_NEAR(L(1), -3.0, 1e-13);
+    }
+
     printf("Test 5 (place_poles hand-derived): PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
-// Test 6: placeObserverPoles — eigenvalue round trip (triple integrator)
+// Test 6: placeObserverPoles — eigenvalue round trip (triple integrator, then O ≠ I)
 // ---------------------------------------------------------------------------
 // System: A = [[0,1,0],[0,0,1],[0,0,0]], C = [1,0,0].
 // O = diag(C, CA, CA²) = I  →  condition number 1.
@@ -402,6 +415,55 @@ void test_place_poles_eigenvalue_roundtrip() {
         for (int i = 0; i < 3; ++i) {
             ASSERT_REL_NEAR(got[i].real(), want[i].real(), 1e-10);
             ASSERT_REL_NEAR(got[i].imag(), want[i].imag(), 1e-10);
+        }
+    }
+
+    // Case 3: a system whose observability matrix is NOT the identity. With the
+    // integrator chains above, O = I, so an implementation that skipped O^{-1}
+    // would still pass. Here, by hand:
+    //   C = [1,1,0], CA = [1,1,1], CA^2 = [4,1,-1]  ->  O = [[1,1,0],[1,1,1],[4,1,-1]],
+    //   det(O) = 1*(-1-1) - 1*(-1-4) + 0 = 3, so (A, C) is observable.
+    // Tolerance 1e-10 still holds: cond(O) is asserted below 100, so inverting O
+    // amplifies rounding by at most ~100x over the O = I cases (~1e-14).
+    {
+        Eigen::MatrixXd A3(3, 3);
+        A3 << 1.0,  2.0,  0.0,
+              0.0, -1.0,  1.0,
+              3.0,  0.0, -2.0;
+        Eigen::MatrixXd C3(1, 3);
+        C3 << 1.0, 1.0, 0.0;
+
+        Eigen::MatrixXd O(3, 3);
+        O << 1.0, 1.0,  0.0,
+             1.0, 1.0,  1.0,
+             4.0, 1.0, -1.0;
+        ASSERT_MATRIX_REL_NEAR(O.row(1), C3 * A3, 0.0);
+        ASSERT_MATRIX_REL_NEAR(O.row(2), C3 * A3 * A3, 0.0);
+        ASSERT_REL_NEAR(O.determinant(), 3.0, 1e-14);
+        Eigen::JacobiSVD<Eigen::MatrixXd> svd(O);
+        double cond = svd.singularValues()(0) / svd.singularValues()(2);
+        ASSERT_CHECK(cond < 100.0, "cond(O) must stay small for the 1e-10 tolerance");
+
+        Eigen::VectorXcd pole_sets[2] = {Eigen::VectorXcd(3), Eigen::VectorXcd(3)};
+        pole_sets[0] << std::complex<double>(-2.0, 0.0),
+                        std::complex<double>(-3.0, 0.0),
+                        std::complex<double>(-4.0, 0.0);
+        pole_sets[1] << std::complex<double>(-3.0,  0.0),
+                        std::complex<double>(-1.0,  2.0),
+                        std::complex<double>(-1.0, -2.0);
+        for (const auto& poles : pole_sets) {
+            Eigen::VectorXd L = caliburn::placeObserverPoles(A3, C3, poles);
+            Eigen::EigenSolver<Eigen::MatrixXd> solver(A3 - L * C3);
+            Eigen::VectorXcd eigs = solver.eigenvalues();
+
+            std::vector<std::complex<double>> got(eigs.data(), eigs.data() + 3);
+            std::vector<std::complex<double>> want(poles.data(), poles.data() + 3);
+            sort_by_re_im(got);
+            sort_by_re_im(want);
+            for (int i = 0; i < 3; ++i) {
+                ASSERT_REL_NEAR(got[i].real(), want[i].real(), 1e-10);
+                ASSERT_REL_NEAR(got[i].imag(), want[i].imag(), 1e-10);
+            }
         }
     }
 
