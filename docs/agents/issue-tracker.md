@@ -11,7 +11,7 @@ Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all op
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
-Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
+All workstream tickets — including those filed while anchored in a project subdirectory — live in the **Caliburn repository** (`caliburn-engineering/caliburn`), not in the project's own repo. Always pass `--repo caliburn-engineering/caliburn` explicitly; do not rely on `git remote` to infer the target.
 
 ## Pull requests as a triage surface
 
