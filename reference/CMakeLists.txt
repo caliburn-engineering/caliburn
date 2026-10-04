@@ -73,6 +73,42 @@ target_include_directories(test_luenberger PRIVATE observers)
 target_link_libraries(test_luenberger PRIVATE Eigen3::Eigen)
 add_test(NAME luenberger COMMAND test_luenberger)
 
+# --- Kalman DARE oracle fixture test (default suite, no external oracle) ---
+add_executable(test_oracle_fixtures
+    observers/kalman_filter.cpp
+    models/double_mass_spring_damper.cpp
+    observers/test_oracle_fixtures.cpp
+)
+target_include_directories(test_oracle_fixtures PRIVATE
+    observers
+    models
+)
+target_link_libraries(test_oracle_fixtures PRIVATE Eigen3::Eigen)
+add_test(NAME kalman_oracle_fixtures COMMAND test_oracle_fixtures)
+
+# --- Kalman DARE live-oracle test (requires SciPy; off by default) ---
+option(CALIBURN_LIVE_ORACLE "Build and register the live-oracle ctest (requires SciPy)" OFF)
+set(CALIBURN_ORACLE_PYTHON "python3" CACHE STRING "Python interpreter for the live-oracle test")
+
+if(CALIBURN_LIVE_ORACLE)
+    add_executable(test_live_oracle
+        observers/test_live_oracle.cpp
+    )
+    target_include_directories(test_live_oracle PRIVATE
+        observers
+    )
+    target_compile_definitions(test_live_oracle PRIVATE
+        ORACLE_SCRIPT="${CMAKE_CURRENT_SOURCE_DIR}/observers/tools/gen_oracle_fixtures.py"
+        ORACLE_PYTHON="${CALIBURN_ORACLE_PYTHON}"
+    )
+    target_link_libraries(test_live_oracle PRIVATE Eigen3::Eigen)
+    add_test(NAME kalman_live_oracle COMMAND test_live_oracle)
+    set_tests_properties(kalman_live_oracle PROPERTIES
+        LABELS "live-oracle"
+        SKIP_RETURN_CODE 77
+    )
+endif()
+
 # --- Simulation ---
 add_executable(test_fixed_timestep
     simulation/fixed_timestep.cpp
