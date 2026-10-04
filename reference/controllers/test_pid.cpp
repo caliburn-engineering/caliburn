@@ -161,6 +161,7 @@ static void check_constant_error_sum() {
 //   After each step integral_ clamps to u_max/Ki = 5.0.
 //   (a) every output is in [u_min, u_max].
 //   (b) integral() never exceeds u_max/Ki = 5.0.
+//   (d) the output clamp holds on its own when P alone saturates (see below).
 //   Flip: setpoint=0, measurement=1 => e=−1.
 //   (c) derivation: integral_clamped=5.0; step 1: integral=5.0−0.25=4.75,
 //       output=4.75 < u_max. So output leaves u_max after exactly 1 step.
@@ -183,11 +184,21 @@ static void check_anti_windup() {
                      "integral exceeds u_max/Ki during saturation");
     }
 
-    // Check (c): flip to e=−1; output must leave u_max in 1 step.
+    // Check (c): flip to e=−1; output must leave u_max in 1 step, landing on
+    // the hand-derived 5.0 − 0.25 = 4.75. Exact: dyadic operands. Tolerance=0.0.
     double out = pid.compute(0.0, 1.0, dt);
-    ASSERT_CHECK(out >= u_min, "output below u_min after flip");
     ASSERT_CHECK(out < u_max,
                  "output did not leave u_max within 1 step (anti-windup)");
+    ASSERT_REL_NEAR(out, 4.75, 0.0);
+
+    // (d) Output clamp, independent of the integrator: with Ki=0 the integral
+    //     clamp is skipped, and Kp·e = 10·(±1) = ±10 lies outside [−5, 5]. The
+    //     output must be exactly u_max, then u_min. With Kp=0 above, the clamped
+    //     integral alone keeps the output in range, so (a) can't catch a missing
+    //     output clamp; this can.
+    PidController p_only(PidGains{10.0, 0.0, 0.0}, u_min, u_max);
+    ASSERT_REL_NEAR(p_only.compute(1.0, 0.0, dt), u_max, 0.0);
+    ASSERT_REL_NEAR(p_only.compute(-1.0, 0.0, dt), u_min, 0.0);
 
     std::printf("  [PASS] Check 2: anti-windup\n");
 }
@@ -233,7 +244,9 @@ static void check_derivative_filter() {
 
 // ---------------------------------------------------------------------------
 // Check 4: dt<=0 guard
-//   compute(…, 0.0) must return 0.0 and leave integral() unchanged.
+//   compute(…, dt) with dt=0 or dt<0 must return 0.0 and leave integral()
+//   unchanged. Only dt<0 makes the integral check bite: at dt=0, e·dt=0 adds
+//   nothing even without the guard.
 //   Mutation that makes it fail: remove "if (dt <= 0.0) return 0.0;" —
 //   without it, raw_derivative = Δm/0 = NaN, so output is NaN, not 0.
 // ---------------------------------------------------------------------------
@@ -250,6 +263,11 @@ static void check_dt_zero_guard() {
     // Without the guard, raw_derivative = 0/0 = NaN, so output is NaN, not 0.0.
     ASSERT_CHECK(out == 0.0, "dt=0 must return exactly 0.0");
     ASSERT_CHECK(pid.integral() == integral_before, "dt=0 must not change integral()");
+
+    // dt<0: without the guard, integral += e·dt = 1·(−0.1) would move it.
+    out = pid.compute(1.0, 0.0, -0.1);
+    ASSERT_CHECK(out == 0.0, "dt<0 must return exactly 0.0");
+    ASSERT_CHECK(pid.integral() == integral_before, "dt<0 must not change integral()");
 
     std::printf("  [PASS] Check 4: dt<=0 guard\n");
 }
