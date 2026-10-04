@@ -250,6 +250,18 @@ void test_a_exact_control_law() {
         }
     }
 
+    // --- BoundaryLayer mode with φ=0 degenerates to Sign: same states, same u ---
+    // σ=+2 → u=−3; σ=−2 → u=+3; σ=0 at x=[1,−2] → u = u_eq = 4. Exact.
+    {
+        SMCParams p{}; p.K = 3.0; p.phi = 0.0;
+        const double cases[][3] = {{1.0, 0.0, -3.0}, {-1.0, 0.0, 3.0}, {1.0, -2.0, 4.0}};
+        for (const auto& c : cases) {
+            SlidingModeController ctrl(p, SMCMode::BoundaryLayer, surface, eq_control);
+            VectorXd x(2); x << c[0], c[1];
+            ASSERT_REL_NEAR(ctrl.compute(x, DT), c[2], 0.0);
+        }
+    }
+
     std::cout << "PASSED\n";
 }
 
@@ -284,61 +296,69 @@ void test_b_super_twisting_sequence() {
         ASSERT_REL_NEAR(u, s.expected_u, 0.0);
     }
 
-    // After reset, v_integral is zeroed; the first output must match step 0 (v=0).
-    ctrl.reset();
+    // The sequence above ends with v = 0, so a reset() that kept v would go
+    // unnoticed. Step once more at σ = +4 to leave v = −0.5 (u = −2 + 0 = −2),
+    // then reset: the next output at the same state must be −2 (v = 0), not
+    // −2.5 (v kept).
     VectorXd xr(2); xr << 2.0, 0.0;
+    ASSERT_REL_NEAR(ctrl.compute(xr, dt_st), -2.0, 0.0);
+    ctrl.reset();
     ASSERT_REL_NEAR(ctrl.compute(xr, dt_st), -2.0, 0.0);
 
     std::cout << "PASSED\n";
 }
 
-// Check C: Discrete reaching condition.
-// With u_eq = −λ·v and Sign mode, σ dynamics collapse to:
-//   σ_{k+1} = σ_k + (u + λ·v_k)·dt = σ_k + (−λ·v_k − K·sign(σ_k) + λ·v_k)·dt
-//           = σ_k − K·sign(σ_k)·dt
-// (u_eq cancels exactly).  Each step reduces |σ| by K·dt = 0.005.
+// Check C: Discrete reaching condition, with a constant matched disturbance d.
+// Plant (Euler, as in simulate()): x_{k+1} = x_k + v_k·dt, v_{k+1} = v_k + (u + d)·dt.
+// With u = u_eq − K·sign(σ_k) and u_eq = −λ·v:
+//   σ_{k+1} = σ_k + (u + d + λ·v_k)·dt = σ_k + (d − K·sign(σ_k))·dt
+// (u_eq cancels exactly). With K > |d|, |σ| shrinks by at least (K − |d|)·dt per
+// step and by at most (K + |d|)·dt.
 //
-// δ = K·dt = 0.005: for |σ_k| > δ the sign of σ cannot flip, so
-//   σ_k·(σ_{k+1}−σ_k) = σ_k·(−K·sign(σ_k)·dt) = −K·|σ_k|·dt < 0.
-// Within |σ| ≤ δ the sign may flip each step (chattering band); we stop asserting.
+// δ = (K + |d|)·dt: for |σ_k| > δ one step cannot carry σ across zero, so
+//   σ_k·(σ_{k+1} − σ_k) = σ_k·(d − K·sign(σ_k))·dt ≤ −(K − |d|)·|σ_k|·dt < 0.
+// Inside |σ| ≤ δ the sign may flip each step (the O(K·dt) chattering band), so
+// the check stops there.
 //
-// Reaching-time bound (d_max=0): t_r = |σ_0|/K = 2.5/5 = 0.5 s.
-// Step bound: ceil(σ_0 / (K·dt)) + 2 = ceil(500) + 2 = 502.
-// (+2 absorbs floating-point drift in the cumulative K·dt subtraction.)
+// Reaching bound: t_r ≤ |σ_0|/(K − |d|), so steps ≤ ceil(|σ_0|/((K − |d|)·dt)) + 2.
+// The +2 absorbs floating-point drift in the repeated (d − K)·dt steps.
+// d = 0 gives 502 steps; d = ±2 gives 836.
 void test_c_reaching_condition() {
     std::cout << "Check C: discrete reaching condition... ";
 
-    SMCParams p{}; p.K = 5.0; p.phi = 0.0;
-    SlidingModeController ctrl(p, SMCMode::Sign, surface, eq_control);
+    const double K = 5.0;
+    const double sigma_0 = 2.5;  // x = [1, 0.5]: σ_0 = v + λ·x = 0.5 + 2·1.0
+    for (double d : {0.0, 2.0, -2.0}) {
+        SMCParams p{}; p.K = K; p.phi = 0.0;
+        SlidingModeController ctrl(p, SMCMode::Sign, surface, eq_control);
 
-    const double K  = 5.0;
-    const double delta = K * DT;              // 0.005: O(K·dt) chattering band
-    VectorXd x(2); x << 1.0, 0.5;
-    // σ_0 = v + λ·x = 0.5 + 2·1.0 = 2.5
-    const double sigma_0 = 2.5;
-    const int step_bound = static_cast<int>(std::ceil(sigma_0 / delta)) + 2;  // 502
+        const double delta = (K + std::abs(d)) * DT;
+        const int step_bound =
+            static_cast<int>(std::ceil(sigma_0 / ((K - std::abs(d)) * DT))) + 2;
+        VectorXd x(2); x << 1.0, 0.5;
 
-    bool band_reached = false;
-    for (int k = 0; k < step_bound && !band_reached; ++k) {
-        double u      = ctrl.compute(x, DT);
-        double sigma_k = ctrl.getSlidingVariable();
+        bool band_reached = false;
+        for (int k = 0; k < step_bound && !band_reached; ++k) {
+            double u       = ctrl.compute(x, DT);
+            double sigma_k = ctrl.getSlidingVariable();
 
-        VectorXd x_next(2);
-        x_next(0) = x(0) + x(1) * DT;
-        x_next(1) = x(1) + u * DT;
-        double sigma_next = surface(x_next);
+            VectorXd x_next(2);
+            x_next(0) = x(0) + x(1) * DT;
+            x_next(1) = x(1) + (u + d) * DT;
+            double sigma_next = surface(x_next);
 
-        if (std::abs(sigma_k) > delta) {
-            ASSERT_CHECK(sigma_k * (sigma_next - sigma_k) < 0.0,
-                "reaching: sigma_k*(sigma_next-sigma_k) < 0 must hold for |sigma_k| > K*dt");
-        } else {
-            band_reached = true;
+            if (std::abs(sigma_k) > delta) {
+                ASSERT_CHECK(sigma_k * (sigma_next - sigma_k) < 0.0,
+                    "reaching: sigma_k*(sigma_next-sigma_k) < 0 must hold for |sigma_k| > (K+|d|)*dt");
+            } else {
+                band_reached = true;
+            }
+            x = x_next;
         }
-        x = x_next;
-    }
 
-    ASSERT_CHECK(band_reached,
-        "sliding band K*dt must be reached within ceil(sigma_0/(K*dt))+2 steps");
+        ASSERT_CHECK(band_reached,
+            "band (K+|d|)*dt must be reached within ceil(sigma_0/((K-|d|)*dt))+2 steps");
+    }
 
     std::cout << "PASSED\n";
 }
