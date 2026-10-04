@@ -21,6 +21,17 @@
         }                                                                       \
     } while (false)
 
+// Boolean assertion for inequalities and bounds (sigma*sigma_dot < 0, |u| <= u_max, ...).
+// Unlike <cassert>'s assert, it stays active under NDEBUG, so Release builds still check.
+#define ASSERT_CHECK(cond, msg)                                                \
+    do {                                                                        \
+        if (!(cond)) {                                                          \
+            std::fprintf(stderr, "%s:%d: ASSERT_CHECK failed: %s (%s)\n",     \
+                         __FILE__, __LINE__, #cond, msg);                       \
+            std::exit(1);                                                       \
+        }                                                                       \
+    } while (false)
+
 // Relative matrix assertion (available when Eigen is included before this header).
 // Passes when ||A - B||_F <= tol * max(||A||_F, ||B||_F, 1.0).
 #ifdef EIGEN_CORE_H

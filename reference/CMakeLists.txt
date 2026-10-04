@@ -243,3 +243,11 @@ add_executable(test_assert_rel
 )
 target_link_libraries(test_assert_rel PRIVATE Eigen3::Eigen)
 add_test(NAME assert_rel COMMAND test_assert_rel)
+
+# ASSERT_CHECK must fire even when NDEBUG disables <cassert>: this test passes only if it exits non-zero.
+add_executable(test_assert_check_fires
+    test/test_assert_check_fires.cpp
+)
+target_compile_definitions(test_assert_check_fires PRIVATE NDEBUG)
+add_test(NAME assert_check_fires COMMAND test_assert_check_fires)
+set_tests_properties(assert_check_fires PROPERTIES WILL_FAIL TRUE)
