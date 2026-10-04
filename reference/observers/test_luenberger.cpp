@@ -1,8 +1,13 @@
 #include "luenberger.h"
+#include "assert_rel.h"
 
+#include <Eigen/Eigenvalues>
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <complex>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // Test 1: Mass-spring-damper — estimate velocity from position measurement
@@ -289,6 +294,159 @@ void test_unobservable_mode() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 5: placeObserverPoles — hand-derived gain (double integrator)
+// ---------------------------------------------------------------------------
+// System: A = [[0,1],[0,0]], C = [1,0].
+// For L = [l1; l2], A−LC = [[−l1, 1],[−l2, 0]].
+// char poly: det(sI − (A−LC)) = s(s+l1) + l2 = s² + l1·s + l2.
+// Desired (s−p1)(s−p2) = s² − (p1+p2)s + p1·p2  →  l1 = −(p1+p2), l2 = p1·p2.
+//
+// O = [[C],[CA]] = [[1,0],[0,1]] = I (condition number 1).
+// Operands are small integers; rounding is ≤ 2^−52 per op, so 1e−13 is safe.
+void test_place_poles_hand_derived() {
+    Eigen::MatrixXd A(2, 2);
+    A << 0.0, 1.0,
+         0.0, 0.0;
+    Eigen::MatrixXd C(1, 2);
+    C << 1.0, 0.0;
+
+    // Case 1: real pair p1=−3, p2=−5
+    // l1 = −(−3 + −5) = 8,  l2 = (−3)·(−5) = 15
+    {
+        Eigen::VectorXcd poles(2);
+        poles << std::complex<double>(-3.0, 0.0),
+                 std::complex<double>(-5.0, 0.0);
+        Eigen::VectorXd L = caliburn::placeObserverPoles(A, C, poles);
+        ASSERT_REL_NEAR(L(0), 8.0,  1e-13);
+        ASSERT_REL_NEAR(L(1), 15.0, 1e-13);
+    }
+
+    // Case 2: conjugate pair p1=−2+3i, p2=−2−3i
+    // l1 = −((−2+3i)+(−2−3i)) = 4,  l2 = (−2+3i)(−2−3i) = 4+9 = 13
+    {
+        Eigen::VectorXcd poles(2);
+        poles << std::complex<double>(-2.0,  3.0),
+                 std::complex<double>(-2.0, -3.0);
+        Eigen::VectorXd L = caliburn::placeObserverPoles(A, C, poles);
+        ASSERT_REL_NEAR(L(0), 4.0,  1e-13);
+        ASSERT_REL_NEAR(L(1), 13.0, 1e-13);
+    }
+
+    printf("Test 5 (place_poles hand-derived): PASSED\n");
+}
+
+// ---------------------------------------------------------------------------
+// Test 6: placeObserverPoles — eigenvalue round trip (triple integrator)
+// ---------------------------------------------------------------------------
+// System: A = [[0,1,0],[0,0,1],[0,0,0]], C = [1,0,0].
+// O = diag(C, CA, CA²) = I  →  condition number 1.
+//
+// Strategy: call placeObserverPoles, form M = A−L·C, compute eig(M) with
+// Eigen::EigenSolver, sort by (real, imag), compare to desired poles.
+//
+// Tolerance 1e-10: O is identity so no amplification from inversion;
+// ~9 Horner multiplications of O(10) matrices → rounding < 9·10·2^−52 ≈ 2e−14;
+// 1e-10 is conservative and deliberately not loosened here.
+void test_place_poles_eigenvalue_roundtrip() {
+    Eigen::MatrixXd A(3, 3);
+    A << 0.0, 1.0, 0.0,
+         0.0, 0.0, 1.0,
+         0.0, 0.0, 0.0;
+    Eigen::MatrixXd C(1, 3);
+    C << 1.0, 0.0, 0.0;
+
+    auto sort_by_re_im = [](std::vector<std::complex<double>>& v) {
+        std::sort(v.begin(), v.end(), [](const std::complex<double>& a,
+                                         const std::complex<double>& b) {
+            if (std::fabs(a.real() - b.real()) > 1e-8) return a.real() < b.real();
+            return a.imag() < b.imag();
+        });
+    };
+
+    // Case 1: three distinct real poles −2, −3, −4
+    {
+        Eigen::VectorXcd poles(3);
+        poles << std::complex<double>(-2.0, 0.0),
+                 std::complex<double>(-3.0, 0.0),
+                 std::complex<double>(-4.0, 0.0);
+        Eigen::VectorXd L = caliburn::placeObserverPoles(A, C, poles);
+        Eigen::MatrixXd M = A - L * C;
+        Eigen::EigenSolver<Eigen::MatrixXd> solver(M);
+        Eigen::VectorXcd eigs = solver.eigenvalues();
+
+        std::vector<std::complex<double>> got(eigs.data(), eigs.data() + 3);
+        std::vector<std::complex<double>> want(poles.data(), poles.data() + 3);
+        sort_by_re_im(got);
+        sort_by_re_im(want);
+        for (int i = 0; i < 3; ++i) {
+            ASSERT_REL_NEAR(got[i].real(), want[i].real(), 1e-10);
+            ASSERT_REL_NEAR(got[i].imag(), want[i].imag(), 1e-10);
+        }
+    }
+
+    // Case 2: real pole −3 and conjugate pair −1±2i
+    {
+        Eigen::VectorXcd poles(3);
+        poles << std::complex<double>(-3.0,  0.0),
+                 std::complex<double>(-1.0,  2.0),
+                 std::complex<double>(-1.0, -2.0);
+        Eigen::VectorXd L = caliburn::placeObserverPoles(A, C, poles);
+        Eigen::MatrixXd M = A - L * C;
+        Eigen::EigenSolver<Eigen::MatrixXd> solver(M);
+        Eigen::VectorXcd eigs = solver.eigenvalues();
+
+        std::vector<std::complex<double>> got(eigs.data(), eigs.data() + 3);
+        std::vector<std::complex<double>> want(poles.data(), poles.data() + 3);
+        sort_by_re_im(got);
+        sort_by_re_im(want);
+        for (int i = 0; i < 3; ++i) {
+            ASSERT_REL_NEAR(got[i].real(), want[i].real(), 1e-10);
+            ASSERT_REL_NEAR(got[i].imag(), want[i].imag(), 1e-10);
+        }
+    }
+
+    printf("Test 6 (place_poles eigenvalue roundtrip): PASSED\n");
+}
+
+// ---------------------------------------------------------------------------
+// Test 7: placeObserverPoles — repeated poles via characteristic polynomial
+// ---------------------------------------------------------------------------
+// Eigenvalues of a defective matrix are ill-conditioned (error ~ sqrt(eps) ~ 1e−8),
+// so we do not compare eigenvalues for repeated poles. Instead we compare the
+// characteristic polynomial coefficients of A−LC with those of (s−p)^n.
+//
+// System: double integrator A = [[0,1],[0,0]], C = [1,0], repeated pole p = −4.
+// Desired poly: (s+4)^2 = s^2 + 8s + 16.
+//
+// For a 2×2 matrix M, char poly = s^2 − tr(M)·s + det(M)  (Faddeev–LeVerrier).
+// O = I; operands are small integers; tolerance 1e−13.
+void test_place_poles_repeated() {
+    Eigen::MatrixXd A(2, 2);
+    A << 0.0, 1.0,
+         0.0, 0.0;
+    Eigen::MatrixXd C(1, 2);
+    C << 1.0, 0.0;
+
+    const double p = -4.0;
+    Eigen::VectorXcd poles(2);
+    poles << std::complex<double>(p, 0.0),
+             std::complex<double>(p, 0.0);
+
+    Eigen::VectorXd L = caliburn::placeObserverPoles(A, C, poles);
+    Eigen::MatrixXd M = A - L * C;
+
+    // Char poly of 2×2 M: p(s) = s^2 − tr(M)·s + det(M)
+    double c1 = -M.trace();        // coefficient of s^1
+    double c0 = M.determinant();   // coefficient of s^0
+
+    // Desired (s − p)^2 = s^2 + 8s + 16  →  c1 = −2p = 8, c0 = p^2 = 16
+    ASSERT_REL_NEAR(c1, -2.0 * p, 1e-13);
+    ASSERT_REL_NEAR(c0,  p * p,   1e-13);
+
+    printf("Test 7 (place_poles repeated poles): PASSED\n");
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     printf("=== Luenberger Observer Tests ===\n\n");
 
@@ -302,6 +460,15 @@ int main() {
     printf("\n");
 
     test_unobservable_mode();
+    printf("\n");
+
+    test_place_poles_hand_derived();
+    printf("\n");
+
+    test_place_poles_eigenvalue_roundtrip();
+    printf("\n");
+
+    test_place_poles_repeated();
     printf("\n");
 
     printf("=== All tests passed ===\n");
