@@ -1,122 +1,126 @@
-// Live-oracle test: run gen_oracle_fixtures.py and verify its K_inf matches
-// the checked-in fixture within rtol = 1e-6.
+// reference/observers/test_live_oracle.cpp
 //
-// This test is gated by the CALIBURN_LIVE_ORACLE CMake option (default OFF)
-// and carries the "live-oracle" ctest label.  It exits with code 77 when
-// SciPy is not importable so ctest reports SKIP rather than FAIL.
+// Live-oracle check of the Kalman DARE fixture: runs export_kalman_dare and
+// gen_oracle_fixtures.py, and cross-checks the fresh SciPy solve against the
+// checked-in observers/fixtures/kalman_dare_dmsd.h.
 //
-// The Python interpreter is selected by CALIBURN_ORACLE_PYTHON (default
-// "python3").
+// Gated by CALIBURN_LIVE_ORACLE (default OFF) and labelled "live-oracle".
+// Exits 77, which ctest reports as Skipped, when scipy does not import in the
+// interpreter CALIBURN_ORACLE_PYTHON names.
+//
+// The fresh header must come from scipy (its Oracle line), carry the same plant
+// hash, and give the same K_inf to 1e-10 relative.  The values are compared as
+// numbers, never as text: a different scipy, LAPACK or CPU moves the last of
+// the 17 printed digits, and that is not a stale fixture.
+//
+// To invoke (from reference/):
+//   cmake -S . -B build -DCALIBURN_LIVE_ORACLE=ON \
+//         -DCALIBURN_ORACLE_PYTHON=.oracle_venv/bin/python3
+//   cmake --build build -j2
+//   ctest --test-dir build -L live-oracle --output-on-failure
 
 #include "fixtures/kalman_dare_dmsd.h"
 #include "oracle_compare.h"
 
 #include <Eigen/Dense>
-#include <cassert>
+#include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
-#include <array>
+#include <fstream>
+#include <regex>
+#include <sstream>
 #include <string>
-#include <vector>
+#include <unistd.h>
 
-// Path to the Python script, injected by CMake via -D.
+#ifndef EXPORT_KALMAN_DARE_EXE
+#  error "EXPORT_KALMAN_DARE_EXE must be defined by CMake"
+#endif
 #ifndef ORACLE_SCRIPT
-#  error "ORACLE_SCRIPT must be defined by CMake (-DORACLE_SCRIPT=<path>)"
+#  error "ORACLE_SCRIPT must be defined by CMake"
 #endif
-
-// Python interpreter to use, injected by CMake via -D.
 #ifndef ORACLE_PYTHON
-#  define ORACLE_PYTHON "python3"
+#  error "ORACLE_PYTHON must be defined by CMake"
 #endif
 
-// ---------------------------------------------------------------------------
-// Parse a K_inf block from the script's output.
-// The script outputs a header file; we extract the four numeric rows inside
-//   K <<
-//       <r00>, <r01>,
-//       ...;
-// ---------------------------------------------------------------------------
-static bool parse_K_from_header(const std::string& text,
-                                 Eigen::Matrix<double, 4, 2>& K) {
-    // Locate "K <<" then read 4 rows of two doubles
-    const char* p = std::strstr(text.c_str(), "K <<");
-    if (!p) return false;
-    p += 4;
+namespace {
 
-    int filled = 0;
-    while (*p && filled < 8) {
-        // skip non-digit chars (spaces, newlines, commas, '<', '>')
-        while (*p && !std::isdigit((unsigned char)*p) && *p != '-' && *p != '+') {
-            if (*p == ';') goto done;  // reached end of matrix literal
-            ++p;
-        }
-        if (!*p) break;
-        char* end;
-        double v = std::strtod(p, &end);
-        if (end == p) { ++p; continue; }
-        K(filled / 2, filled % 2) = v;
-        ++filled;
-        p = end;
-    }
-done:
-    return filled == 8;
+constexpr int kSkip = 77;
+// Two SciPy solves of the same matrices agree far tighter than this.
+constexpr double kRelTol = 1e-10;
+
+std::string read_file(const char* path) {
+    std::ifstream f(path);
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
 }
 
+}  // namespace
+
 int main() {
-    // Build the command: python3 tools/gen_oracle_fixtures.py
-    std::string cmd = std::string(ORACLE_PYTHON) + " " + ORACLE_SCRIPT + " 2>&1";
+    if (std::system("\"" ORACLE_PYTHON "\" -c \"import scipy\" 2>/dev/null") != 0) {
+        std::printf("SKIP: scipy does not import in %s; install it there, or "
+                    "point CALIBURN_ORACLE_PYTHON at a Python that has it\n",
+                    ORACLE_PYTHON);
+        return kSkip;
+    }
 
-    // Run and capture stdout
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) {
-        std::fprintf(stderr, "popen failed for: %s\n", cmd.c_str());
+    char fresh_path[256];
+    std::snprintf(fresh_path, sizeof(fresh_path),
+                  "/tmp/kalman_live_oracle_%d.h", (int)getpid());
+    char cmd[2048];
+    std::snprintf(cmd, sizeof(cmd), "\"%s\" | \"%s\" \"%s\" - > \"%s\"",
+                  EXPORT_KALMAN_DARE_EXE, ORACLE_PYTHON, ORACLE_SCRIPT, fresh_path);
+    const int rc = std::system(cmd);
+    const std::string fresh = read_file(fresh_path);
+    std::remove(fresh_path);
+    if (rc != 0 || fresh.empty()) {
+        std::fprintf(stderr, "FAIL: export_kalman_dare | gen_oracle_fixtures.py failed\n");
         return 1;
     }
 
-    std::string output;
-    std::array<char, 4096> buf;
-    while (std::fgets(buf.data(), static_cast<int>(buf.size()), pipe))
-        output += buf.data();
-
-    int rc = pclose(pipe);
-
-    // exit 77 when SciPy is missing (script exits with code 1 and prints to stderr)
-    if (rc != 0) {
-        if (output.find("SciPy is not installed") != std::string::npos ||
-            output.find("No module named 'scipy'") != std::string::npos ||
-            output.find("No module named 'numpy'") != std::string::npos) {
-            std::fprintf(stdout, "SKIP: SciPy not available — skipping live-oracle test\n");
-            return 77;  // ctest SKIP
-        }
-        std::fprintf(stderr, "Oracle script failed (rc=%d):\n%s\n", rc, output.c_str());
+    std::smatch m;
+    if (!std::regex_search(fresh, m, std::regex(R"(// Oracle: (scipy [^\n]*))"))) {
+        std::fprintf(stderr, "FAIL: the fresh fixture does not come from scipy\n");
         return 1;
     }
+    const std::string oracle = m[1];
 
-    // Parse K_inf from the generated header text
-    Eigen::Matrix<double, 4, 2> K_oracle;
-    if (!parse_K_from_header(output, K_oracle)) {
+    if (!std::regex_search(fresh, m, std::regex(R"(PLANT_HASH = 0x([0-9a-f]{16})ULL)"))) {
+        std::fprintf(stderr, "FAIL: no plant hash in the fresh fixture\n");
+        return 1;
+    }
+    const uint64_t fresh_hash = std::stoull(m[1].str(), nullptr, 16);
+    if (fresh_hash != caliburn::fixtures::KALMAN_DARE_DMSD_PLANT_HASH) {
         std::fprintf(stderr,
-            "Failed to parse K_inf from oracle output:\n%s\n", output.c_str());
+            "FAIL: plant hash %016" PRIx64 " from the exporter, %016" PRIx64
+            " in the fixture -- the fixture is stale\n",
+            fresh_hash, caliburn::fixtures::KALMAN_DARE_DMSD_PLANT_HASH);
         return 1;
     }
 
-    // Compare against checked-in fixture
-    Eigen::MatrixXd K_fixture = caliburn::fixtures::kalman_dare_K_inf().cast<double>();
-    Eigen::MatrixXd K_oracle_d = K_oracle.cast<double>();
-
-    bool ok = caliburn::matrices_close_rel(K_oracle_d, K_fixture, 1e-6);
-    if (!ok) {
-        std::fprintf(stderr, "LIVE ORACLE MISMATCH\n");
-        std::fprintf(stderr, "SciPy K_inf:\n");
-        for (int i = 0; i < 4; ++i)
-            std::fprintf(stderr, "  %.17g  %.17g\n", K_oracle(i,0), K_oracle(i,1));
-        std::fprintf(stderr, "Fixture K_inf:\n");
-        for (int i = 0; i < 4; ++i)
-            std::fprintf(stderr, "  %.17g  %.17g\n", K_fixture(i,0), K_fixture(i,1));
+    const Eigen::MatrixXd stored = caliburn::fixtures::kalman_dare_K_inf();
+    Eigen::MatrixXd K = Eigen::MatrixXd::Constant(stored.rows(), stored.cols(), NAN);
+    const std::regex elem(R"(K\((\d+), (\d+)\) = ([^;]+);)");
+    for (std::sregex_iterator it(fresh.begin(), fresh.end(), elem), end; it != end; ++it) {
+        const int i = std::stoi((*it)[1]);
+        const int j = std::stoi((*it)[2]);
+        if (i < K.rows() && j < K.cols()) K(i, j) = std::stod((*it)[3]);
     }
-    assert(ok && "SciPy K_inf does not match checked-in fixture");
+    if (!K.allFinite()) {
+        std::fprintf(stderr, "FAIL: the fresh fixture does not give every K_inf element\n");
+        return 1;
+    }
+    if (!caliburn::matrices_close_rel(K, stored, kRelTol)) {
+        std::fprintf(stderr, "FAIL: SciPy's K_inf differs from the fixture (rel tol %.0e)\n",
+                     kRelTol);
+        for (int i = 0; i < K.rows(); ++i)
+            std::fprintf(stderr, "  fresh  %.17g  %.17g   fixture  %.17g  %.17g\n",
+                         K(i, 0), K(i, 1), stored(i, 0), stored(i, 1));
+        return 1;
+    }
 
-    std::printf("  [PASS] Live oracle: SciPy K_inf matches fixture within rtol=1e-6\n");
+    std::printf("Live oracle check passed: %s agrees with kalman_dare_dmsd.h "
+                "(max |dK| %.2e)\n", oracle.c_str(), (K - stored).cwiseAbs().maxCoeff());
     return 0;
 }
