@@ -1,4 +1,5 @@
 #include "smc.h"
+#include "assert_rel.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -180,6 +181,168 @@ void test_failure_exceeds_bound() {
     std::cout << "PASSED (final pos=" << final_pos << " — diverged as expected)\n";
 }
 
+// Check A: Control law, exact, per mode.
+// surface: σ = v + λ·x.  eq_control: u_eq = −λ·v.
+// Sign:          u = u_eq − K·sign(σ).
+// BoundaryLayer: u = u_eq − K·sat(σ/φ).
+// All expected values are dyadic rationals; tolerance 0.0 means exact equality.
+void test_a_exact_control_law() {
+    std::cout << "Check A: exact control law per mode... ";
+
+    // --- Sign mode ---
+    {
+        SMCParams p{}; p.K = 3.0; p.phi = 0.0;
+
+        // σ > 0: x=[1,0], σ=0+2·1=2, u_eq=0, u_sw=−K=−3, u=−3
+        {
+            SlidingModeController ctrl(p, SMCMode::Sign, surface, eq_control);
+            VectorXd x(2); x << 1.0, 0.0;
+            double u = ctrl.compute(x, DT);
+            ASSERT_REL_NEAR(ctrl.getSlidingVariable(), 2.0, 0.0);
+            ASSERT_REL_NEAR(u, -3.0, 0.0);
+        }
+        // σ < 0: x=[−1,0], σ=−2, u_eq=0, u_sw=+K=+3, u=3
+        {
+            SlidingModeController ctrl(p, SMCMode::Sign, surface, eq_control);
+            VectorXd x(2); x << -1.0, 0.0;
+            double u = ctrl.compute(x, DT);
+            ASSERT_REL_NEAR(ctrl.getSlidingVariable(), -2.0, 0.0);
+            ASSERT_REL_NEAR(u, 3.0, 0.0);
+        }
+        // σ = 0: x=[1,−2], σ=−2+2·1=0, u_eq=−λ·(−2)=4, u_sw=0, u=4
+        {
+            SlidingModeController ctrl(p, SMCMode::Sign, surface, eq_control);
+            VectorXd x(2); x << 1.0, -2.0;
+            double u = ctrl.compute(x, DT);
+            ASSERT_REL_NEAR(ctrl.getSlidingVariable(), 0.0, 0.0);
+            ASSERT_REL_NEAR(u, 4.0, 0.0);
+        }
+    }
+
+    // --- BoundaryLayer mode: φ=1, K=3 ---
+    {
+        SMCParams p{}; p.K = 3.0; p.phi = 1.0;
+
+        // Inside |σ| < φ: x=[0.25,0], σ=0.5, sat(0.5/1)=0.5, u_sw=−1.5, u=−1.5
+        // 0.25 = 2^−2 is a dyadic rational; all arithmetic is exact.
+        {
+            SlidingModeController ctrl(p, SMCMode::BoundaryLayer, surface, eq_control);
+            VectorXd x(2); x << 0.25, 0.0;
+            double u = ctrl.compute(x, DT);
+            ASSERT_REL_NEAR(ctrl.getSlidingVariable(), 0.5, 0.0);
+            ASSERT_REL_NEAR(u, -1.5, 0.0);
+        }
+        // Outside σ > φ: x=[1,0], σ=2, sat(2/1)=1, u_sw=−3, u=−3
+        {
+            SlidingModeController ctrl(p, SMCMode::BoundaryLayer, surface, eq_control);
+            VectorXd x(2); x << 1.0, 0.0;
+            double u = ctrl.compute(x, DT);
+            ASSERT_REL_NEAR(ctrl.getSlidingVariable(), 2.0, 0.0);
+            ASSERT_REL_NEAR(u, -3.0, 0.0);
+        }
+        // Outside σ < −φ: x=[−1,0], σ=−2, sat(−2/1)=−1, u_sw=+3, u=3
+        {
+            SlidingModeController ctrl(p, SMCMode::BoundaryLayer, surface, eq_control);
+            VectorXd x(2); x << -1.0, 0.0;
+            double u = ctrl.compute(x, DT);
+            ASSERT_REL_NEAR(ctrl.getSlidingVariable(), -2.0, 0.0);
+            ASSERT_REL_NEAR(u, 3.0, 0.0);
+        }
+    }
+
+    std::cout << "PASSED\n";
+}
+
+// Check B: Super-twisting integrator sequence.
+// k1=1, k2=1, dt=0.5.  States give σ ∈ {4,1,−1,−4} (perfect squares) so
+// sqrt(|σ|) ∈ {2,1} is exact in double.  u_eq = −λ·v = 0 for all steps (v=0).
+//
+// v-trace (v_integral starts at 0):
+//   k  x          σ    sqrt sign  u_sw=−k1·sqrt·sign+v    u     v_next=v−k2·sign·dt
+//   0  [ 2, 0]   +4    2    +1    −2+0    =−2.0          −2.0   0−0.5=−0.5
+//   1  [0.5, 0]  +1    1    +1    −1+(−0.5)=−1.5         −1.5  −0.5−0.5=−1.0
+//   2  [−0.5,0]  −1    1    −1    +1+(−1.0)= 0.0          0.0  −1.0+0.5=−0.5
+//   3  [−2, 0]   −4    2    −1    +2+(−0.5)=+1.5         +1.5  −0.5+0.5= 0.0
+// All operands are dyadic rationals; tolerance 0.0 means exact equality.
+void test_b_super_twisting_sequence() {
+    std::cout << "Check B: super-twisting integrator sequence... ";
+
+    SMCParams p{}; p.K = 0.0; p.phi = 0.0; p.k1 = 1.0; p.k2 = 1.0;
+    SlidingModeController ctrl(p, SMCMode::SuperTwisting, surface, eq_control);
+
+    const double dt_st = 0.5;
+    struct Step { double x0, x1, expected_u; };
+    const Step steps[] = {
+        { 2.0,  0.0, -2.0},
+        { 0.5,  0.0, -1.5},
+        {-0.5,  0.0,  0.0},
+        {-2.0,  0.0,  1.5},
+    };
+    for (const auto& s : steps) {
+        VectorXd xs(2); xs << s.x0, s.x1;
+        double u = ctrl.compute(xs, dt_st);
+        ASSERT_REL_NEAR(u, s.expected_u, 0.0);
+    }
+
+    // After reset, v_integral is zeroed; the first output must match step 0 (v=0).
+    ctrl.reset();
+    VectorXd xr(2); xr << 2.0, 0.0;
+    ASSERT_REL_NEAR(ctrl.compute(xr, dt_st), -2.0, 0.0);
+
+    std::cout << "PASSED\n";
+}
+
+// Check C: Discrete reaching condition.
+// With u_eq = −λ·v and Sign mode, σ dynamics collapse to:
+//   σ_{k+1} = σ_k + (u + λ·v_k)·dt = σ_k + (−λ·v_k − K·sign(σ_k) + λ·v_k)·dt
+//           = σ_k − K·sign(σ_k)·dt
+// (u_eq cancels exactly).  Each step reduces |σ| by K·dt = 0.005.
+//
+// δ = K·dt = 0.005: for |σ_k| > δ the sign of σ cannot flip, so
+//   σ_k·(σ_{k+1}−σ_k) = σ_k·(−K·sign(σ_k)·dt) = −K·|σ_k|·dt < 0.
+// Within |σ| ≤ δ the sign may flip each step (chattering band); we stop asserting.
+//
+// Reaching-time bound (d_max=0): t_r = |σ_0|/K = 2.5/5 = 0.5 s.
+// Step bound: ceil(σ_0 / (K·dt)) + 2 = ceil(500) + 2 = 502.
+// (+2 absorbs floating-point drift in the cumulative K·dt subtraction.)
+void test_c_reaching_condition() {
+    std::cout << "Check C: discrete reaching condition... ";
+
+    SMCParams p{}; p.K = 5.0; p.phi = 0.0;
+    SlidingModeController ctrl(p, SMCMode::Sign, surface, eq_control);
+
+    const double K  = 5.0;
+    const double delta = K * DT;              // 0.005: O(K·dt) chattering band
+    VectorXd x(2); x << 1.0, 0.5;
+    // σ_0 = v + λ·x = 0.5 + 2·1.0 = 2.5
+    const double sigma_0 = 2.5;
+    const int step_bound = static_cast<int>(std::ceil(sigma_0 / delta)) + 2;  // 502
+
+    bool band_reached = false;
+    for (int k = 0; k < step_bound && !band_reached; ++k) {
+        double u      = ctrl.compute(x, DT);
+        double sigma_k = ctrl.getSlidingVariable();
+
+        VectorXd x_next(2);
+        x_next(0) = x(0) + x(1) * DT;
+        x_next(1) = x(1) + u * DT;
+        double sigma_next = surface(x_next);
+
+        if (std::abs(sigma_k) > delta) {
+            ASSERT_CHECK(sigma_k * (sigma_next - sigma_k) < 0.0,
+                "reaching: sigma_k*(sigma_next-sigma_k) < 0 must hold for |sigma_k| > K*dt");
+        } else {
+            band_reached = true;
+        }
+        x = x_next;
+    }
+
+    ASSERT_CHECK(band_reached,
+        "sliding band K*dt must be reached within ceil(sigma_0/(K*dt))+2 steps");
+
+    std::cout << "PASSED\n";
+}
+
 int main() {
     std::cout << "=== Sliding Mode Controller Tests ===\n";
     test_sign_convergence();
@@ -187,6 +350,9 @@ int main() {
     test_super_twisting();
     test_robustness();
     test_failure_exceeds_bound();
+    test_a_exact_control_law();
+    test_b_super_twisting_sequence();
+    test_c_reaching_condition();
     std::cout << "=== All SMC tests passed ===\n";
     return 0;
 }
