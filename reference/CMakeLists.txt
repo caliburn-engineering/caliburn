@@ -73,6 +73,54 @@ target_include_directories(test_luenberger PRIVATE observers)
 target_link_libraries(test_luenberger PRIVATE Eigen3::Eigen)
 add_test(NAME luenberger COMMAND test_luenberger)
 
+# --- Kalman DARE oracle (ported from ball-balancer's oracle fixtures) ---
+# The plant (F, H, Q, R) and its hash live in observers/tools/kalman_dare_plant.h,
+# shared by the exporter and the default-suite test.  Regenerate the fixture
+# with SciPy:
+#   cmake --build build --target export_kalman_dare
+#   ./build/export_kalman_dare | python3 observers/tools/gen_oracle_fixtures.py - \
+#       > observers/fixtures/kalman_dare_dmsd.h
+add_executable(export_kalman_dare
+    observers/tools/export_kalman_dare.cpp
+    models/double_mass_spring_damper.cpp
+)
+target_include_directories(export_kalman_dare PRIVATE observers/tools models)
+target_link_libraries(export_kalman_dare PRIVATE Eigen3::Eigen)
+
+# Default suite, no oracle needed: the filter's steady state against the
+# checked-in SciPy fixture, plus the staleness guard.
+add_executable(test_kalman_oracle
+    observers/kalman_filter.cpp
+    models/double_mass_spring_damper.cpp
+    observers/test_oracle_fixtures.cpp
+)
+target_include_directories(test_kalman_oracle PRIVATE observers observers/tools models)
+target_link_libraries(test_kalman_oracle PRIVATE Eigen3::Eigen)
+add_test(NAME kalman_oracle_fixtures COMMAND test_kalman_oracle)
+
+# Live oracle, off by default: re-solves the plant with SciPy and cross-checks
+# the fixture.  Skipped (exit 77) when scipy does not import.
+option(CALIBURN_LIVE_ORACLE "Build and register the live-oracle tests (requires SciPy)" OFF)
+set(CALIBURN_ORACLE_PYTHON "python3" CACHE STRING
+    "Python interpreter with scipy, used by the live-oracle tests")
+
+if(CALIBURN_LIVE_ORACLE)
+    add_executable(test_kalman_live_oracle observers/test_live_oracle.cpp)
+    target_include_directories(test_kalman_live_oracle PRIVATE observers)
+    target_compile_definitions(test_kalman_live_oracle PRIVATE
+        EXPORT_KALMAN_DARE_EXE="$<TARGET_FILE:export_kalman_dare>"
+        ORACLE_SCRIPT="${CMAKE_CURRENT_SOURCE_DIR}/observers/tools/gen_oracle_fixtures.py"
+        ORACLE_PYTHON="${CALIBURN_ORACLE_PYTHON}"
+    )
+    target_link_libraries(test_kalman_live_oracle PRIVATE Eigen3::Eigen)
+    add_dependencies(test_kalman_live_oracle export_kalman_dare)
+    add_test(NAME kalman_live_oracle COMMAND test_kalman_live_oracle)
+    set_tests_properties(kalman_live_oracle PROPERTIES
+        LABELS "live-oracle"
+        SKIP_RETURN_CODE 77
+    )
+endif()
+
 # --- Simulation ---
 add_executable(test_fixed_timestep
     simulation/fixed_timestep.cpp

@@ -35,6 +35,7 @@ const TICKETS: Record<number, { repo: "caliburn" | "bb"; slug: string }> = {
   51: { repo: "bb", slug: "residual-gate" },
   52: { repo: "bb", slug: "live-oracle" },
   53: { repo: "bb", slug: "pydrake" },
+  55: { repo: "caliburn", slug: "kalman-dare" },
   63: { repo: "bb", slug: "roundoff-robust" },
 };
 
@@ -57,7 +58,7 @@ const isBB = meta.repo === "bb";
 // rather than the GL visualizer when GL is absent.
 const verify = isBB
   ? `Build and run the desktop test suite:
-    cmake -S . -B build -DGLFW_BUILD_WAYLAND=OFF && cmake --build build -j && ctest --test-dir build --output-on-failure
+    cmake -S . -B build -DGLFW_BUILD_WAYLAND=OFF && cmake --build build -j2 && ctest --test-dir build --output-on-failure
   The image has no Wayland dev libraries, hence -DGLFW_BUILD_WAYLAND=OFF (CI installs
   them and needs no flag). The first configure fetches Eigen and takes several
   minutes — do not abandon it.
@@ -66,7 +67,7 @@ const verify = isBB
   targets instead (e.g. --target test_<name>) and say so in your issue comment.
   Do NOT attempt the Emscripten/web build; this workstream's CI is desktop-only.`
   : `Verify per what you changed, following AGENTS.md and docs/agents:
-    - C++ in reference/: cmake -B reference/build -S reference && cmake --build reference/build && ctest --test-dir reference/build --output-on-failure
+    - C++ in reference/: cmake -B reference/build -S reference && cmake --build reference/build -j2 && ctest --test-dir reference/build --output-on-failure
     - Docs only: no build; confirm every link resolves to a file that exists.
     - New GitHub issues you create: confirm they exist with the intended labels.`;
 
