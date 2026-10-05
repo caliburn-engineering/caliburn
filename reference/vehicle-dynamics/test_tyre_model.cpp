@@ -6,10 +6,10 @@
 
 using namespace caliburn;
 
-// TODO(#75): tolerance unjustified — every use measures exactly 0 in Release (linear
-// proportionality, zero-slip forces, saturated magnitude and direction ratio), so 1e-3 N
-// is far looser than the arithmetic needs. Kept per #75: no tolerance values change.
-static constexpr double kTol = 1e-3;
+// Exact: every use below measures exactly 0 in Release — linear proportionality,
+// zero-slip forces, and the saturated magnitude and direction ratio all evaluate to
+// bitwise-exact results under IEEE 754. Tolerance = 0.
+static constexpr double kTol = 0.0;
 
 static PacejkaParams default_lateral_params() {
     return PacejkaParams{
@@ -35,11 +35,10 @@ void test_linear_tyre() {
     // Force proportional to slip angle
     double F1 = tyre.lateral_force(0.01);   // ~1 degree
     double F2 = tyre.lateral_force(0.02);   // ~2 degrees
-    // 1e-3 abs: linear tyre is exactly proportional; F1≈800 N, F2≈1600 N — absolute is tighter than relative
+    // Exact: C_alpha*0.02 = 2*(C_alpha*0.01) by IEEE 754; difference is bitwise zero.
     ASSERT_CHECK(std::abs(F2 - 2.0 * F1) < kTol, "linear tyre force is exactly proportional to slip angle");
 
-    // Zero slip = zero force
-    // 1e-3: stiffness * 0 = 0 exactly; floor-1 scale makes this an absolute check on a near-zero value
+    // Exact: C_alpha * 0 = 0; scale = max(0,0,1) = 1, threshold = kTol*1 = 0.
     ASSERT_REL_NEAR(tyre.lateral_force(0.0), 0.0, kTol);
 
     printf("  linear tyre: F(0.01) = %.1f N — PASS\n", F1);
@@ -48,8 +47,7 @@ void test_linear_tyre() {
 void test_pacejka_shape() {
     PacejkaTyre tyre(default_lateral_params());
 
-    // Zero slip = zero force
-    // 1e-3: sin(C*atan(0)) = sin(0) = 0 exactly; floor-1 scale makes this an absolute check
+    // Exact: sin(C*atan(0)) = sin(0) = 0; scale = 1 (floor), threshold = 0.
     ASSERT_REL_NEAR(tyre.force(0.0), 0.0, kTol);
 
     // Force increases initially
@@ -67,6 +65,10 @@ void test_pacejka_shape() {
     double F_post = tyre.force(2.0 * peak);
     ASSERT_CHECK(peak_force > F_post, "force drops past the peak (post-peak regime of the Magic Formula)");
 
+    // Hand-derived at slip=0.05: Bs=0.5, inner=Bs+0.5*(Bs-atan(Bs))=0.5182,
+    // f=D*sin(C*atan(inner))=3286.10 N; 5 FP ops with |result|≈3286, tol=1e-4 rel ≈ 0.33 N.
+    ASSERT_REL_NEAR(tyre.force(0.05), 3286.0984309292, 1e-4);
+
     printf("  pacejka shape: peak at slip=%.3f, F_peak=%.1f N — PASS\n", peak, peak_force);
 }
 
@@ -75,9 +77,9 @@ void test_pacejka_peak_bounded_by_D() {
 
     // Peak force should not exceed D (the peak parameter)
     double peak_force = tyre.peak_force();
-    // TODO(#75): tolerance unjustified — sin() <= 1 bounds the peak by D exactly, and the
-    // measured peak/D is 1.0 (Release); the 1% margin is not needed for rounding.
-    ASSERT_CHECK(peak_force <= default_lateral_params().D * 1.01,
+    // Exact: force(slip) = D*sin(C*atan(...)) ≤ D because |sin| ≤ 1 always.
+    // Measured Release: peak/D = 1.0 exactly.
+    ASSERT_CHECK(peak_force <= default_lateral_params().D,
                  "Pacejka peak force is bounded by D (the peak scale factor)");
 
     printf("  peak force (%.1f) <= D (%.1f) — PASS\n",
@@ -111,12 +113,12 @@ void test_traction_circle_saturate() {
     circle.saturate(Fx, Fy, Fz);
 
     double F_mag = std::sqrt(Fx * Fx + Fy * Fy);
-    // 1e-3 abs: saturate must scale exactly to F_max=4500 N; absolute is tighter than relative at this magnitude
+    // Exact: scale = F_max / sqrt(Fx²+Fy²) applied to both; sqrt(scaled²+scaled²) = F_max exactly.
     ASSERT_CHECK(std::abs(F_mag - F_max) < kTol, "saturated magnitude equals F_max exactly");
 
     // Direction preserved
     double ratio = Fx / Fy;
-    // 1e-3 abs: ratio≈1.33 > 1, so relative-1 floor gives 1e-3*1.33; kept absolute for a stricter bound
+    // Exact: scale cancels in Fx/Fy = (4000·s)/(3000·s); IEEE 754 preserves the ratio.
     ASSERT_CHECK(std::abs(ratio - 4000.0 / 3000.0) < kTol, "direction ratio Fx/Fy is preserved by saturation");
 
     printf("  traction circle saturate: F_mag=%.1f, ratio preserved — PASS\n", F_mag);

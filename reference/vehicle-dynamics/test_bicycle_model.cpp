@@ -6,9 +6,10 @@
 
 using namespace caliburn;
 
-// TODO(#75): tolerance unjustified — its one use (steady-state yaw rate) evaluates the same
-// closed form on both sides and measures a difference of exactly 0 in Release.
-static constexpr double kTol = 1e-4;
+// Exact: steady_state_yaw_rate calls wheelbase() + understeer_gradient() and evaluates
+// V*delta/(L+K_us*V²) — identical operands and order as r_expected below; IEEE 754 gives
+// a bitwise-identical result. Tolerance = 0.
+static constexpr double kTol = 0.0;
 
 static VehicleParams default_car() {
     return VehicleParams{
@@ -77,9 +78,9 @@ void test_simulation_converges_to_steady_state() {
     double r_ss = model.steady_state_yaw_rate(delta, V);
 
     double error = std::abs(r_sim - r_ss);
-    // TODO(#75): tolerance unjustified — measured error is 2.6e-13 (Release), so 1e-3 is
-    // ~1e9x looser than the RK4 settling error actually reached.
-    ASSERT_CHECK(error < 0.001, "RK4 simulation converges to steady-state yaw rate within 0.001 rad/s after 5 s");
+    // FP accumulation over 5000 RK4 steps: N·eps·|r_ss| ≈ 5000·2.2e-16·0.13 ≈ 1.7e-13;
+    // safety factor 10 → 2e-12. Measured Release: 2.6e-13.
+    ASSERT_CHECK(error < 2e-12, "RK4 simulation converges to steady-state yaw rate within 2e-12 rad/s after 5 s");
     printf("  simulation converges to r_ss: error = %.6f — PASS\n", error);
 }
 
