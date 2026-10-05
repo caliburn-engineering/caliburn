@@ -140,10 +140,10 @@ void test_step_response_rk4() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B * F;
 
     double err = (x_final - x_ss).norm();
-    // Transient decay at slowest pole: sigma_min = 0.382 rad/s (softer mode, from eigenvalues
-    // of underdamped double-MSD at these params). Modal decomp: err <= cond(V)*|x_ss|*e^{-sigma*T}
-    // where cond(V) ~ 2 (measured), |x_ss| = 1.118, T = 50 s: bound = 2*1.118*e^{-19.1} = 1.1e-8;
-    // measured 1.1e-8. Use 1e-7 (10x margin).
+    // Transient decay: A is diagonalisable, so ‖e^{At}‖ ≤ κ(V)·e^{σ t} with σ = -0.382 rad/s
+    // (the softer mode, -0.382 ± 1.92j) and κ(V) = 6.0 for these parameters. From x0 = 0, with
+    // |x_ss| = |[0.5, 0, 1, 0]| = 1.118: err ≤ 6.0·1.118·e^{-0.382·50} ≈ 3.4e-8. RK4 at
+    // h·|λ|max ≈ 0.005 tracks e^{hλ} to O((hλ)^5) per step, negligible. 1e-7 is ~3× over the bound.
     ASSERT_CHECK(err < 1e-7, "step response did not converge to steady state");
 
     std::cout << "  [PASS] Test 4: Step response converges to analytical steady-state (err="

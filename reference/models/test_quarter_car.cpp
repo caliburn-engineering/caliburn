@@ -2,6 +2,7 @@
 #include "../integrators/rk4.h"
 #include "../test/assert_rel.h"
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <complex>
 
@@ -79,16 +80,17 @@ void test_bump_response() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B_w * bump_height;
 
     double err = (x_final - x_ss).norm();
-    // Transient decay at slowest pole: sigma_min = 2.116 rad/s (body-bounce mode,
-    // from eigenvalues of default-param A). Modal decomp: err <= cond(V)*|x_ss|*e^{-sigma*T}.
-    // cond(V) <= 60 (measured 5.8, from 2.63e-10 = cond(V)*0.071*e^{-21.2}); bound =
-    // 60*0.071*e^{-21.16} = 2.7e-9; measured 2.6e-10. Use 1e-8 (4x margin).
+    // Transient decay: A is diagonalisable, so ‖e^{At}‖ ≤ κ(V)·e^{σ t} with σ = -2.116 rad/s
+    // (the slower, body-bounce pair -2.116 ± 7.61j) and κ(V) = 80.5 for the default parameters.
+    // From x0 = 0: err ≤ κ(V)·|x_ss|·e^{σ·10} = 80.5·0.0707·e^{-21.16} ≈ 3.7e-9. RK4 at
+    // h·|λ|max ≈ 0.037 tracks e^{hλ} to O((hλ)^5) per step, negligible here.
+    // 1e-8 is ~2.7× over the bound.
     ASSERT_CHECK(err < 1e-8, "bump response did not settle to steady state");
 
     // Steady-state body position should equal bump height (body rises to road level)
     // x_ss(0) = z_b should be approximately bump_height
-    // Static 4x4 solve; exact answer is bump_height. Error: cond(A)*eps*|result| where
-    // cond(A) ~ 10 and eps = 2.2e-16: bound = 10*2.2e-16*0.05 ~ 1e-16. Use 1e-14.
+    // Static 4x4 solve; the exact answer is bump_height. Forward error ≲ n·κ(A)·u·|x_ss|, with
+    // κ(A) = 5554 for the default parameters: 4·5554·1.1e-16·0.0707 ≈ 1.7e-16. 1e-14 is ~60× over.
     ASSERT_CHECK(std::abs(x_ss(0) - bump_height) < 1e-14,
                  "steady-state body position does not match bump height");
 
@@ -124,32 +126,37 @@ void test_input_matrices() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 5: A matrix structure — checks A(1,3) = c_s/m_b to catch the mutation
-// that zeros this entry (suspension damper coupling dropped from body equation)
+// Test 5: A matrix, every entry, against the equations of motion
+//   z_ddot_b = [-k_s(z_b - z_w) - c_s(z_dot_b - z_dot_w) + F_a] / m_b
+//   z_ddot_w = [ k_s(z_b - z_w) + c_s(z_dot_b - z_dot_w) - k_t(z_w - z_r) - F_a] / m_w
+// Each expected entry is the same single IEEE division (or sum then division) of the
+// parameters as the model must perform, so the comparison is exact (tolerance 0).
+// Default parameters are used: m_b ≠ m_w and k_s ≠ k_t, so a swapped mass or
+// stiffness changes the entry. This catches, for example, the damper coupling A(1,3)
+// dropped to 0, A(3,1) dropped, or a wheel-row entry divided by m_b.
 // ---------------------------------------------------------------------------
 void test_a_matrix_structure() {
     caliburn::QuarterCarParams p;
     auto model = caliburn::build_quarter_car(p);
 
-    // 1e-12: A entries are simple ratios of exactly-representable integer parameters;
-    // IEEE arithmetic gives exact or near-exact results.
-    double tol = 1e-12;
+    Eigen::Matrix4d expected;
+    expected <<            0.0,             1.0,                       0.0,             0.0,
+               -p.k_s / p.m_b, -p.c_s / p.m_b,             p.k_s / p.m_b,   p.c_s / p.m_b,
+                           0.0,             0.0,                       0.0,             1.0,
+                p.k_s / p.m_w,  p.c_s / p.m_w, -(p.k_s + p.k_t) / p.m_w,  -p.c_s / p.m_w;
 
-    // Row 0: trivial kinematic row [0, 1, 0, 0]
-    ASSERT_CHECK(model.A(0, 0) == 0.0, "A(0,0) must be 0");
-    ASSERT_CHECK(model.A(0, 1) == 1.0, "A(0,1) must be 1 (kinematic)");
-    ASSERT_CHECK(model.A(0, 2) == 0.0, "A(0,2) must be 0");
-    ASSERT_CHECK(model.A(0, 3) == 0.0, "A(0,3) must be 0");
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            if (model.A(i, j) != expected(i, j)) {
+                std::fprintf(stderr, "A(%d,%d) = %.17g, expected %.17g\n", i, j,
+                             model.A(i, j), expected(i, j));
+            }
+            ASSERT_CHECK(model.A(i, j) == expected(i, j),
+                         "quarter-car A entry must match the equations of motion exactly");
+        }
+    }
 
-    // Row 1: z_ddot_b from suspension spring and damper
-    // A(1,0) = -k_s/m_b = -66.67, A(1,2) = k_s/m_b = 66.67 — magnitudes > 1.
-    ASSERT_CHECK(std::abs(model.A(1, 0) - (-p.k_s / p.m_b)) < tol, "A(1,0) = -k_s/m_b");
-    // A(1,1) = -c_s/m_b = -5.0, A(1,3) = c_s/m_b = 5.0 — magnitudes > 1.
-    ASSERT_CHECK(std::abs(model.A(1, 1) - (-p.c_s / p.m_b)) < tol, "A(1,1) = -c_s/m_b");
-    ASSERT_CHECK(std::abs(model.A(1, 2) - (p.k_s / p.m_b)) < tol, "A(1,2) = k_s/m_b");
-    ASSERT_CHECK(std::abs(model.A(1, 3) - (p.c_s / p.m_b)) < tol, "A(1,3) = c_s/m_b");
-
-    std::cout << "  [PASS] Test 5: A matrix structure verified (including A(1,3) = c_s/m_b)\n";
+    std::cout << "  [PASS] Test 5: every A entry matches the equations of motion\n";
 }
 
 // ---------------------------------------------------------------------------
