@@ -28,9 +28,10 @@ static void test_p_only_step_response() {
     }
 
     double error = std::fabs(setpoint - x);
-    // TODO(#75): tolerance unjustified — error decays as (1 - Kp*dt)^n = 0.98^1000 ~ 1.7e-9,
-    // so 0.01 is ~1e7x looser than the derivable error.
-    ASSERT_CHECK(error < 0.01, "P-only convergence: error should be < 0.01 after 1000 steps");
+    // P-only on integrator plant: error_k = (1 − Kp·dt)^k = 0.98^1000 ≈ 1.7e-9 (exact analytic decay).
+    // Floating-point per-step roundoff ≤ 3·u propagated through 0.98 contraction:
+    // ε_fp ≤ 3·u/(1−0.98) ≈ 3.3e-14 (negligible). 5e-9 gives ~3× margin.
+    ASSERT_CHECK(error < 5e-9, "P-only convergence: error should be < 5e-9 after 1000 steps");
     std::printf("  [PASS] P-only step response (error=%.6f)\n", error);
 }
 
@@ -54,9 +55,10 @@ static void test_pi_steady_state() {
     }
 
     double error = std::fabs(setpoint - x);
-    // TODO(#75): tolerance unjustified — measured error prints as 0.000000 in Release;
-    // 0.01 is a loose convergence bound, not derived from the closed-loop decay rate.
-    ASSERT_CHECK(error < 0.01, "PI steady-state error should be < 0.01 after 5000 steps");
+    // Discrete closed-loop eigenvalue magnitude ≈ 0.9926 (poles of A_d = I+dt·A_cl);
+    // transient after 5000 steps: 0.9926^5000 ≈ 6.5e-17; floating-point roundoff accumulated
+    // ≤ 5·u·5000/(1−0.9926) ≈ 1e-11 (geometric sum); 1e-10 gives 10× margin.
+    ASSERT_CHECK(error < 1e-10, "PI steady-state error should be < 1e-10 after 5000 steps");
     std::printf("  [PASS] PI eliminates steady-state error (error=%.6f)\n", error);
 }
 

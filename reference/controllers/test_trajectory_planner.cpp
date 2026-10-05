@@ -329,6 +329,40 @@ static void test_trapezoidal_check4_boundary_case() {
 }
 
 // ---------------------------------------------------------------------------
+// 12. MinJerk: interior position catches s→s² mutation
+// ---------------------------------------------------------------------------
+// MinJerkTrajectory(q0=0, qf=1, T=1) at t=0.5 (tau=0.5):
+//   tau3=1/8, tau4=1/16, tau5=1/32.
+//   s = 10·(1/8) − 15·(1/16) + 6·(1/32) = 5/4 − 15/16 + 3/16 = 8/16 = 1/2.
+//   position = q0 + (qf − q0)·s = 0 + 1·(1/2) = 1/2.
+//   All operands are dyadic rationals → exact in IEEE 754; tolerance = 0.0.
+// Mutation s→s² at tau=0.5 gives s²=1/4 → position=1/4 ≠ 1/2 (caught).
+// Endpoints where s=s² (s∈{0,1}) are immune; interior points are not.
+static void check_minjerk_interior_position() {
+    MinJerkTrajectory traj(0.0, 1.0, 1.0);
+    // t=0.5: tau=0.5, s=1/2 (dyadic). Exact, tolerance=0.0.
+    ASSERT_REL_NEAR(traj.position(0.5), 0.5, 0.0);
+    std::printf("  [PASS] MinJerk interior position at t=0.5T (catches s->s^2 mutation)\n");
+}
+
+// ---------------------------------------------------------------------------
+// 13. Trapezoidal: deceleration interior position catches sign-flip mutation
+// ---------------------------------------------------------------------------
+// TrapezoidalTrajectory(q0=0, qf=8, v_max=2, a_max=1): t_a=2, T=6.
+// At t=5 (deceleration phase, T−t_a=4 ≤ 5 ≤ T=6):
+//   dt = T−t = 1. sign=+1, a=1.
+//   position = qf − ½·a·dt² = 8 − 0.5·1·1 = 7.5.
+//   All operands are integers → exact; tolerance = 0.0.
+// Mutation (sign flip): qf + ½·a·dt² = 8.5 ≠ 7.5 (caught).
+// position(T) = qf at t=T is immune to the sign (dt=0); interior points are not.
+static void check_trapezoidal_decel_interior() {
+    TrapezoidalTrajectory traj(0.0, 8.0, 2.0, 1.0);
+    // t=5: decel phase, dt=1, expected 8 − 0.5·1·1 = 7.5. Exact, tolerance=0.0.
+    ASSERT_REL_NEAR(traj.position(5.0), 7.5, 0.0);
+    std::printf("  [PASS] Trapezoidal decel interior position at t=5 (catches sign-flip mutation)\n");
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("Trajectory planner tests:\n");
 
@@ -343,6 +377,8 @@ int main() {
     test_trapezoidal_check2_boundary_conditions();
     test_trapezoidal_check3_bounds_and_continuity();
     test_trapezoidal_check4_boundary_case();
+    check_minjerk_interior_position();
+    check_trapezoidal_decel_interior();
 
     std::printf("All trajectory planner tests passed.\n");
     return 0;

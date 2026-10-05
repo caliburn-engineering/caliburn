@@ -114,10 +114,11 @@ void test_riccati_residual() {
                              - P * B * Rinv_Bt * P + Q;
 
     double residual_norm = residual.norm();
-    // TODO(#75): tolerance unjustified — 1e-6 is ~1e7× larger than the ~1e-13 rounding
-    // expected from the 4×4 Hamiltonian eigendecomposition (unit Q, R); this is a
-    // sanity bound only, not a precision guarantee.
-    ASSERT_CHECK(residual_norm < 1e-6, "lqr: Riccati equation residual too large");
+    // 4×4 Hamiltonian eigendecomposition: backward error per H-entry ≈ n²·u·‖H‖_F ≈ 1e-14;
+    // P-entry error ε_P ≈ κ(V)·1e-14 ≈ 1e-13 (κ(V) ≈ O(10) for this well-conditioned system);
+    // residual sensitivity per element ≈ ‖A‖+‖PBBᵀ‖ ≈ 3; ‖residual‖_F ≤ √4·3·1e-13 ≈ 6e-13;
+    // 1e-11 adds ~20× safety.
+    ASSERT_CHECK(residual_norm < 1e-11, "lqr: Riccati equation residual too large");
 
     std::cout << "  [PASS] Test 3: Riccati equation residual = "
               << residual_norm << "\n";
