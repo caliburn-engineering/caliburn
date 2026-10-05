@@ -289,7 +289,9 @@ static void check_dt_zero_guard() {
 //   Ki * integral = -2 * 0.5 = -1.0 = output_min.
 //   Bug (today's main): std::clamp(25, 0.5, -0.5) is UB — with
 //     -D_GLIBCXX_ASSERTIONS the process aborts at "Assertion '!(__hi < __lo)' failed";
-//     without it, integral is pinned at -0.5 (wrong), so Ki*integral = 1 > output_max.
+//     without it, clamp returns hi = -0.5, so Ki*integral = +1. That still lies inside
+//     [u_min, u_max], so the per-step range checks pass; the exact integral == 0.5
+//     check below is the one that catches it.
 // ---------------------------------------------------------------------------
 static void check_negative_ki_anti_windup() {
     const double Ki = -2.0, u_min = -1.0, u_max = 1.0, dt = 0.25;
