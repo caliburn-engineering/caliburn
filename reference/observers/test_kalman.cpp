@@ -196,10 +196,45 @@ void test_innovation_consistency() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 4: Joseph-form covariance — scalar 1D case, hand-derived
+// ---------------------------------------------------------------------------
+// Scalar system: n=1, m=1, F=1, H=1, Q=0, R=3.  Prior P=2.
+// After one predict+update:
+//   P_pred = F·P·F^T + Q = 2
+//   K = P_pred·H^T·(H·P_pred·H^T + R)^{-1} = 2/(2+3) = 2/5
+//   Joseph form: A = I−KH = 3/5
+//     P_post = A·P_pred·A^T + K·R·K^T = (9/25)·2 + (4/25)·3 = 18/25 + 12/25 = 30/25 = 6/5
+// Mutation (drop K·R·K^T): P_mut = A·P_pred·A^T = 18/25 = 0.72 ≠ 1.2.
+// Operands are small rationals; rounding ≤ 5·2^{-52}; tolerance 1e-13.
+void test_joseph_form_scalar() {
+    caliburn::KalmanFilter kf(1, 1);
+
+    Eigen::MatrixXd F(1, 1); F << 1.0;
+    Eigen::MatrixXd H(1, 1); H << 1.0;
+    Eigen::MatrixXd Q(1, 1); Q << 0.0;
+    Eigen::MatrixXd R(1, 1); R << 3.0;
+    kf.set_model(F, H, Q, R);
+
+    Eigen::VectorXd x0(1); x0 << 0.0;
+    Eigen::MatrixXd P0(1, 1); P0 << 2.0;
+    kf.set_state(x0, P0);
+
+    Eigen::VectorXd z(1); z << 0.0;
+    kf.predict();
+    kf.update(z);
+
+    // K = 2/5; A = 3/5; P_post = (3/5)^2·2 + (2/5)^2·3 = 18/25 + 12/25 = 30/25 = 6/5 = 1.2
+    ASSERT_REL_NEAR(kf.covariance()(0, 0), 1.2, 1e-13);
+
+    std::printf("  [PASS] Test 4: Joseph-form covariance (scalar hand-derived)\n");
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     test_constant_velocity_tracking();
     test_covariance_convergence();
     test_innovation_consistency();
+    test_joseph_form_scalar();
 
     std::printf("\nAll Kalman filter tests passed.\n");
     return 0;

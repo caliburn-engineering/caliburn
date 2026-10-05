@@ -78,8 +78,15 @@ void test_mass_spring_damper() {
     // After 5 seconds with poles at -20,-25, error should be negligible
     double err = obs.errorNorm(x_true);
     printf("Test 1 (mass-spring-damper): final error = %.6e\n", err);
-    // 1e-3: measured err = 4.6e-4 (Release), only ~2x margin. Not the e^{-100} a pure pole-decay
-    // estimate suggests, so a small change to this test or observer can tip it over.
+    // Bound 1e-3 is a convergence-quality threshold, not a precision check; kept unchanged.
+    // A pure continuous pole-decay estimate gives e^{-20·5}≈2e-44, but the actual floor is O(dt):
+    // both systems use Forward Euler (dt=0.001), and y is sampled AFTER x_true steps, so the
+    // innovation carries a one-step advance C·A·x_true·dt. The steady-state particular solution is
+    // e_ss ≈ dt·(A−LC)⁻¹·L·C·A·x_true.  With det(A−LC)=500 the matrix (A−LC)⁻¹·L·C·A
+    // = [[0,−0.996],[0,0.178]], so ‖e_ss‖ ≈ dt·0.996·|v(5s)|.  The complex eigenvalues of A are
+    // −0.25±1.39i, giving |v(5s)| ≈ e^{−1.25}·1.39·|sin(6.96)| ≈ 0.25 → ‖e_ss‖ ≈ 2.5e−4.
+    // Poles of A−LC: char poly s²+45s+500=(s+20)(s+25) ✓ (confirmed by Eigen at runtime).
+    // Measured (Release): 4.6e-4. 1e-3 is a 2× margin on this O(dt) floor.
     ASSERT_CHECK(err < 1e-3, "observer should converge for mass-spring-damper");
     printf("  PASSED\n");
 }
@@ -226,11 +233,14 @@ void test_separation_principle() {
 
     printf("Test 3 (separation principle): true state norm = %.6e, "
            "observer error = %.6e\n", state_err, obs_err);
-    // TODO(#75): tolerance unjustified — measured state_err = 3.9e-8 (Release), so 1e-3 is
-    // ~1e4x looser than achieved.
-    ASSERT_CHECK(state_err < 1e-3, "true state should converge to origin");
-    // TODO(#75): tolerance unjustified — measured obs_err is exactly 0 (Release).
-    ASSERT_CHECK(obs_err < 1e-4, "observer should track true state");
+    // Discrete controller poles (1−2dt)=0.998 and (1−3dt)=0.997; 0.998^10000≈e^{-20}≈2e-9.
+    // With cond(V_cl)≤15 and ‖x(0)‖=2 the homogeneous contribution is ≤6e-8; BK-coupling from
+    // observer error adds O(dt·‖BK‖·T)≤O(1e-7); ×10 safety → 1e-6. Measured (Release): 3.9e-8.
+    ASSERT_CHECK(state_err < 1e-6, "true state should converge to origin");
+    // Observer error e satisfies e_dot=(A−LC)e; discrete eigenvalues (1−10dt)=0.99 and
+    // (1−15dt)=0.985; 0.99^10000≈e^{-100}≈4e-44; cond(V_obs)·2·4e-44≈5e-42 underflows double
+    // precision. Bound 1e-14 sits at the numerical floor. Measured (Release): 0.0 exactly.
+    ASSERT_CHECK(obs_err < 1e-14, "observer should track true state");
     printf("  PASSED\n");
 }
 

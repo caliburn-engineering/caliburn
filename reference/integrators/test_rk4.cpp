@@ -55,10 +55,12 @@ void test_harmonic_oscillator() {
     const double x_error = std::abs(y(0) - std::cos(t_end));
     const double v_error = std::abs(y(1) + std::sin(t_end));
 
-    // TODO(#75): tolerance unjustified — actual error ~5e-14 in Release; 1e-6 is ~1e8× loose, order-lowering mutations give ~5e-7 and still pass
-    ASSERT_CHECK(x_error < 1e-6, "harmonic oscillator: x error should be < 1e-6 at t_end");
-    // TODO(#75): tolerance unjustified — actual error ~5e-14 in Release; 1e-6 is ~1e8× loose, order-lowering mutations give ~5e-7 and still pass
-    ASSERT_CHECK(v_error < 1e-6, "harmonic oscillator: v error should be < 1e-6 at t_end");
+    // RK4 global error ≤ (e^{L·T}−1)/L · h^4/120 · max‖y^(5)‖ (Lipschitz L=1, T=2π, h=0.001).
+    // y^(5) = [v;−x] for this ODE, so max‖y^(5)‖=1; bound ≈ 4.5e-12; ×2 safety → 1e-11.
+    // Mutation k4←k2 gives x_error≈2.6e-10; mutation k3←k1 gives x_error≈3.6e-10: both fail here.
+    // Measured (Release): x_error≈5e-15, v_error≈5e-14.
+    ASSERT_CHECK(x_error < 1e-11, "harmonic oscillator: x error should be < 1e-11 at t_end");
+    ASSERT_CHECK(v_error < 1e-11, "harmonic oscillator: v error should be < 1e-11 at t_end");
     std::cout << "  harmonic oscillator x_err = " << x_error
               << "  v_err = " << v_error << "  PASS\n";
 }
