@@ -1,6 +1,6 @@
 #include "quarter_car.h"
 #include "../integrators/rk4.h"
-#include <cassert>
+#include "../test/assert_rel.h"
 #include <cmath>
 #include <iostream>
 #include <complex>
@@ -29,11 +29,11 @@ void test_natural_frequencies() {
     // The actual eigenfrequencies will differ from these approximations because
     // of coupling, but should be in the right ballpark
     // Body mode: expect 1-2 Hz
-    assert(freqs_hz[0] > 0.5 && freqs_hz[0] < 3.0 &&
-           "body bounce frequency out of expected range");
+    // Plausibility bands for a passenger-car quarter model: body bounce ~1-1.5 Hz,
+    // wheel hop ~10-15 Hz. Measured 1.21 Hz and 11.2 Hz (Release).
+    ASSERT_CHECK(freqs_hz[0] > 0.5 && freqs_hz[0] < 3.0, "body bounce frequency out of expected range");
     // Wheel hop mode: expect 8-15 Hz
-    assert(freqs_hz[2] > 5.0 && freqs_hz[2] < 20.0 &&
-           "wheel hop frequency out of expected range");
+    ASSERT_CHECK(freqs_hz[2] > 5.0 && freqs_hz[2] < 20.0, "wheel hop frequency out of expected range");
 
     std::cout << "  [PASS] Test 1: Natural frequencies in expected range "
               << "(body=" << freqs_hz[0] << " Hz, wheel=" << freqs_hz[2] << " Hz)\n";
@@ -49,7 +49,7 @@ void test_eigenvalues_stable() {
     Eigen::EigenSolver<Eigen::Matrix4d> es(model.A);
     for (int i = 0; i < 4; ++i) {
         double re = es.eigenvalues()(i).real();
-        assert(re < 0.0 && "eigenvalue has non-negative real part");
+        ASSERT_CHECK(re < 0.0, "eigenvalue has non-negative real part");
     }
 
     std::cout << "  [PASS] Test 2: All eigenvalues have negative real parts\n";
@@ -79,12 +79,16 @@ void test_bump_response() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B_w * bump_height;
 
     double err = (x_final - x_ss).norm();
-    assert(err < 0.01 && "bump response did not settle to steady state");
+    // TODO(#75): tolerance unjustified — measured err = 2.6e-10 (Release), so 0.01 is ~1e7x
+    // looser than the observed settling error.
+    ASSERT_CHECK(err < 0.01, "bump response did not settle to steady state");
 
     // Steady-state body position should equal bump height (body rises to road level)
     // x_ss(0) = z_b should be approximately bump_height
-    assert(std::abs(x_ss(0) - bump_height) < 0.001 &&
-           "steady-state body position does not match bump height");
+    // TODO(#75): tolerance unjustified — x_ss comes from a static 4x4 solve; measured
+    // error is 6.9e-18 (Release), so 0.001 is ~1e14x looser than achieved.
+    ASSERT_CHECK(std::abs(x_ss(0) - bump_height) < 0.001,
+                 "steady-state body position does not match bump height");
 
     std::cout << "  [PASS] Test 3: Bump response settles correctly (err=" << err
               << ", z_b_ss=" << x_ss(0) << ")\n";
@@ -97,19 +101,22 @@ void test_input_matrices() {
     caliburn::QuarterCarParams p;
     auto model = caliburn::build_quarter_car(p);
 
+    // 1e-12: B_u and B_w entries are simple ratios of exactly-representable parameter
+    // values (m_b=300, m_w=40, k_t=200000); IEEE arithmetic gives exact or near-exact results.
     double tol = 1e-12;
 
     // B_u: active force on body (+1/m_b) and wheel (-1/m_w)
-    assert(model.B_u(0) == 0.0);
-    assert(std::abs(model.B_u(1) - 1.0 / p.m_b) < tol);
-    assert(model.B_u(2) == 0.0);
-    assert(std::abs(model.B_u(3) - (-1.0 / p.m_w)) < tol);
+    ASSERT_CHECK(model.B_u(0) == 0.0, "B_u(0) must be 0");
+    ASSERT_REL_NEAR(model.B_u(1), 1.0 / p.m_b, tol);  // expected 1/300 ≈ 0.0033; scale = 1
+    ASSERT_CHECK(model.B_u(2) == 0.0, "B_u(2) must be 0");
+    ASSERT_REL_NEAR(model.B_u(3), -1.0 / p.m_w, tol); // expected -1/40 = -0.025; scale = 1
 
     // B_w: road disturbance enters only through tyre spring on wheel
-    assert(model.B_w(0) == 0.0);
-    assert(model.B_w(1) == 0.0);
-    assert(model.B_w(2) == 0.0);
-    assert(std::abs(model.B_w(3) - p.k_t / p.m_w) < tol);
+    ASSERT_CHECK(model.B_w(0) == 0.0, "B_w(0) must be 0");
+    ASSERT_CHECK(model.B_w(1) == 0.0, "B_w(1) must be 0");
+    ASSERT_CHECK(model.B_w(2) == 0.0, "B_w(2) must be 0");
+    // B_w(3) = k_t/m_w = 200000/40 = 5000 — magnitude >> 1, so ASSERT_REL_NEAR would be looser.
+    ASSERT_CHECK(std::abs(model.B_w(3) - p.k_t / p.m_w) < tol, "B_w(3) = k_t/m_w");
 
     std::cout << "  [PASS] Test 4: B_u and B_w matrix structure verified\n";
 }

@@ -1,11 +1,13 @@
 #include "linearizer.h"
 
-#include <cassert>
+#include "../test/assert_rel.h"
 #include <cmath>
 #include <cstdio>
 
 using namespace caliburn;
 
+// 1e-8: central-difference Jacobian; truncation and round-off both ~1e-10 for these
+// well-conditioned test cases; also bounds exact C, D construction from these tests.
 static constexpr double TOL = 1e-8;
 static constexpr double G = 9.81;
 static constexpr double K = 5.0 / 7.0;
@@ -30,18 +32,20 @@ static void test_mass_spring_damper() {
 
     auto sys = linearize(f, x0, u0);
 
-    assert(std::abs(sys.A(0, 0) - 0.0) < TOL);
-    assert(std::abs(sys.A(0, 1) - 1.0) < TOL);
-    assert(std::abs(sys.A(1, 0) - (-k / m)) < TOL);
-    assert(std::abs(sys.A(1, 1) - (-b / m)) < TOL);
-    assert(std::abs(sys.B(0, 0) - 0.0) < TOL);
-    assert(std::abs(sys.B(1, 0) - (1.0 / m)) < TOL);
+    ASSERT_REL_NEAR(sys.A(0, 0), 0.0, TOL);    // expected 0; scale = 1
+    ASSERT_REL_NEAR(sys.A(0, 1), 1.0, TOL);    // expected 1; scale = 1
+    // A(1,0) = -k/m = -5.0 — magnitude > 1, so ASSERT_REL_NEAR would be looser.
+    ASSERT_CHECK(std::abs(sys.A(1, 0) - (-k / m)) < TOL, "A(1,0) = -k/m");
+    ASSERT_REL_NEAR(sys.A(1, 1), -b / m, TOL); // expected -0.25; scale = 1
+    ASSERT_REL_NEAR(sys.B(0, 0), 0.0, TOL);    // expected 0; scale = 1
+    ASSERT_REL_NEAR(sys.B(1, 0), 1.0 / m, TOL); // expected 0.5; scale = 1
 
     // C should be identity, D should be zero
-    assert(sys.C.rows() == 2 && sys.C.cols() == 2);
-    assert(sys.D.rows() == 2 && sys.D.cols() == 1);
-    assert((sys.C - Eigen::MatrixXd::Identity(2, 2)).norm() < TOL);
-    assert(sys.D.norm() < TOL);
+    ASSERT_CHECK(sys.C.rows() == 2 && sys.C.cols() == 2, "C must be 2x2");
+    ASSERT_CHECK(sys.D.rows() == 2 && sys.D.cols() == 1, "D must be 2x1");
+    // ||I_2||_F = sqrt(2) > 1; ASSERT_MATRIX_REL_NEAR would be looser than 1e-8 absolute.
+    ASSERT_CHECK((sys.C - Eigen::MatrixXd::Identity(2, 2)).norm() < TOL, "C should equal identity");
+    ASSERT_CHECK(sys.D.norm() < TOL, "D should be zero");
 
     std::printf("  [PASS] Mass-spring-damper — exact A, B recovered\n");
 }
@@ -77,9 +81,13 @@ static void test_ball_balancer_linearization() {
 
     auto result = validate(analytical, f, x0, u0, 1e-6);
 
-    assert(result.pass);
-    assert(result.max_A_error < 1e-8);
-    assert(result.max_B_error < 1e-6);  // sin linearization via central diff
+    ASSERT_CHECK(result.pass, "ball-balancer validation must pass");
+    // TODO(#75): tolerance unjustified — A is linear in the state, so central differences are
+    // exact up to round-off; measured max_A_error = 0 (Release).
+    ASSERT_CHECK(result.max_A_error < 1e-8, "max A error must be < 1e-8");
+    // TODO(#75): tolerance unjustified — sin linearization at u0=0 via central diff;
+    // measured max_B_error = 1.2e-12 (Release), so 1e-6 is ~1e6x looser than achieved.
+    ASSERT_CHECK(result.max_B_error < 1e-6, "max B error must be < 1e-6 (sin linearization via central diff)");
 
     std::printf("  [PASS] Ball-balancer analytical vs numerical (max_A=%.2e, max_B=%.2e)\n",
                 result.max_A_error, result.max_B_error);
@@ -104,11 +112,11 @@ static void test_custom_output_matrices() {
 
     auto sys = linearize(f, x0, u0, C, D);
 
-    assert(sys.C.rows() == 1 && sys.C.cols() == 2);
-    assert(std::abs(sys.C(0, 0) - 1.0) < TOL);
-    assert(std::abs(sys.C(0, 1) - 0.0) < TOL);
-    assert(sys.D.rows() == 1 && sys.D.cols() == 1);
-    assert(sys.D.norm() < TOL);
+    ASSERT_CHECK(sys.C.rows() == 1 && sys.C.cols() == 2, "C must be 1x2");
+    ASSERT_REL_NEAR(sys.C(0, 0), 1.0, TOL);  // expected 1; scale = 1
+    ASSERT_REL_NEAR(sys.C(0, 1), 0.0, TOL);  // expected 0; scale = 1
+    ASSERT_CHECK(sys.D.rows() == 1 && sys.D.cols() == 1, "D must be 1x1");
+    ASSERT_CHECK(sys.D.norm() < TOL, "D should be zero");
 
     std::printf("  [PASS] Custom C and D passed through correctly\n");
 }
@@ -130,8 +138,11 @@ static void test_nonzero_operating_point() {
 
     auto sys = linearize(f, x0, u0);
 
-    assert(std::abs(sys.A(0, 0) - (-4.0)) < 1e-6);
-    assert(std::abs(sys.B(0, 0) - 1.0) < TOL);
+    // A(0,0) = -4.0 — magnitude > 1, so ASSERT_REL_NEAR would be looser.
+    // TODO(#75): tolerance unjustified — central diff of -x² is exact up to round-off
+    // (~eps/h); measured error 1.2e-10 (Release), so 1e-6 is ~1e4x looser.
+    ASSERT_CHECK(std::abs(sys.A(0, 0) - (-4.0)) < 1e-6, "A(0,0) = df/dx = -2*x0 = -4");
+    ASSERT_REL_NEAR(sys.B(0, 0), 1.0, TOL);  // expected 1; scale = 1
 
     std::printf("  [PASS] Nonzero operating point (A=%.4f, B=%.4f)\n",
                 sys.A(0, 0), sys.B(0, 0));
@@ -151,9 +162,9 @@ static void test_zero_operating_point() {
 
     auto sys = linearize(f, x0, u0);
 
-    assert(std::abs(sys.A(0, 1) - 1.0) < TOL);
-    assert(std::abs(sys.A(1, 0) - (-1.0)) < TOL);
-    assert(std::abs(sys.B(0, 0) - 1.0) < TOL);
+    ASSERT_REL_NEAR(sys.A(0, 1), 1.0, TOL);   // expected 1; scale = 1
+    ASSERT_REL_NEAR(sys.A(1, 0), -1.0, TOL);  // expected -1; scale = 1
+    ASSERT_REL_NEAR(sys.B(0, 0), 1.0, TOL);   // expected 1; scale = 1
 
     std::printf("  [PASS] Zero operating point — no NaN or division by zero\n");
 }
