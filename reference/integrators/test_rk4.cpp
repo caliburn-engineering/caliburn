@@ -55,10 +55,11 @@ void test_harmonic_oscillator() {
     const double x_error = std::abs(y(0) - std::cos(t_end));
     const double v_error = std::abs(y(1) + std::sin(t_end));
 
-    // RK4 global error ≤ (e^{L·T}−1)/L · h^4/120 · max‖y^(5)‖ (Lipschitz L=1, T=2π, h=0.001).
-    // y^(5) = [v;−x] for this ODE, so max‖y^(5)‖=1; bound ≈ 4.5e-12; ×2 safety → 1e-11.
-    // Mutation k4←k2 gives x_error≈2.6e-10; mutation k3←k1 gives x_error≈3.6e-10: both fail here.
-    // Measured (Release): x_error≈5e-15, v_error≈5e-14.
+    // For y' = A·y with A a rotation, the exact propagator is orthogonal, so local errors
+    // add without growth: truncation ≤ N·h^5/120·‖y‖ = 6283·1e-15/120 ≈ 5.2e-14 (the leading
+    // term of e^{hλ} - R_RK4(hλ) with |λ| = 1). Worst-case round-off ≤ N·4u ≈ 2.8e-12 at
+    // ‖y‖ = 1. 1e-11 is ~3.5× over the sum. The order-lowering mutations (k4 from k2, k3 from
+    // k1) leave errors ≥ 2.6e-10 and fail here; they passed the old 1e-6.
     ASSERT_CHECK(x_error < 1e-11, "harmonic oscillator: x error should be < 1e-11 at t_end");
     ASSERT_CHECK(v_error < 1e-11, "harmonic oscillator: v error should be < 1e-11 at t_end");
     std::cout << "  harmonic oscillator x_err = " << x_error

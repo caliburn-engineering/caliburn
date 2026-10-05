@@ -78,15 +78,14 @@ void test_mass_spring_damper() {
     // After 5 seconds with poles at -20,-25, error should be negligible
     double err = obs.errorNorm(x_true);
     printf("Test 1 (mass-spring-damper): final error = %.6e\n", err);
-    // Bound 1e-3 is a convergence-quality threshold, not a precision check; kept unchanged.
-    // A pure continuous pole-decay estimate gives e^{-20·5}≈2e-44, but the actual floor is O(dt):
-    // both systems use Forward Euler (dt=0.001), and y is sampled AFTER x_true steps, so the
-    // innovation carries a one-step advance C·A·x_true·dt. The steady-state particular solution is
-    // e_ss ≈ dt·(A−LC)⁻¹·L·C·A·x_true.  With det(A−LC)=500 the matrix (A−LC)⁻¹·L·C·A
-    // = [[0,−0.996],[0,0.178]], so ‖e_ss‖ ≈ dt·0.996·|v(5s)|.  The complex eigenvalues of A are
-    // −0.25±1.39i, giving |v(5s)| ≈ e^{−1.25}·1.39·|sin(6.96)| ≈ 0.25 → ‖e_ss‖ ≈ 2.5e−4.
-    // Poles of A−LC: char poly s²+45s+500=(s+20)(s+25) ✓ (confirmed by Eigen at runtime).
-    // Measured (Release): 4.6e-4. 1e-3 is a 2× margin on this O(dt) floor.
+    // 1e-3 is not a pole-decay bound and cannot be tightened. The loop measures y = C·x_{k+1}
+    // (after the true state steps) while the observer still holds x̂_k, so x̂_k = x_{k+1} is an
+    // exact invariant of the observer recursion: substituting gives innovation 0 and
+    // x̂_{k+1} = x_{k+1} + dt·A·x_{k+1} = x_{k+2}. The observer converges (poles -20, -25, so
+    // the initial error is gone by e^{-100}) onto the state one step AHEAD, and the final error
+    // is ‖x_N - x_{N+1}‖ = dt·‖A·x(T)‖ = 1e-3·0.4629 ≈ 4.63e-4. That is an O(dt) offset set by
+    // the true state's derivative at T = 5 s, deterministic for this test. 1e-3 leaves ~2.2×.
+    // A change to dt, the horizon or the measurement timing moves it directly.
     ASSERT_CHECK(err < 1e-3, "observer should converge for mass-spring-damper");
     printf("  PASSED\n");
 }
@@ -233,14 +232,17 @@ void test_separation_principle() {
 
     printf("Test 3 (separation principle): true state norm = %.6e, "
            "observer error = %.6e\n", state_err, obs_err);
-    // Discrete controller poles (1−2dt)=0.998 and (1−3dt)=0.997; 0.998^10000≈e^{-20}≈2e-9.
-    // With cond(V_cl)≤15 and ‖x(0)‖=2 the homogeneous contribution is ≤6e-8; BK-coupling from
-    // observer error adds O(dt·‖BK‖·T)≤O(1e-7); ×10 safety → 1e-6. Measured (Release): 3.9e-8.
+    // [x; e] evolves exactly linearly: x_{k+1} = (I + dt(A-BK))x_k + dt·BK·e_k and, because y is
+    // measured before the step, e_{k+1} = (I + dt(A-LC))e_k. The 4×4 step matrix has eigenvalues
+    // 0.998, 0.997, 0.99, 0.985 and eigenvector condition number κ = 112.6, so
+    // ‖x(T)‖ ≤ κ·‖[x0; e0]‖·0.998^10000 = 112.6·2.83·2.0e-9 ≈ 6.4e-7. 1e-6 is ~1.6× over.
     ASSERT_CHECK(state_err < 1e-6, "true state should converge to origin");
-    // Observer error e satisfies e_dot=(A−LC)e; discrete eigenvalues (1−10dt)=0.99 and
-    // (1−15dt)=0.985; 0.99^10000≈e^{-100}≈4e-44; cond(V_obs)·2·4e-44≈5e-42 underflows double
-    // precision. Bound 1e-14 sits at the numerical floor. Measured (Release): 0.0 exactly.
-    ASSERT_CHECK(obs_err < 1e-14, "observer should track true state");
+    // The exact observer error is 0.99^10000-scale (≈ 1e-42), far below round-off. What
+    // remains is the difference in rounding between the x and x̂ updates: ≤ ~2u·‖x‖ per step,
+    // contracting at 0.99 against x's 0.998, so ≲ 2u/(1 - 0.99/0.998) ≈ 250u ≈ 2.8e-14 of
+    // ‖x‖. Once x̂ and x coincide bitwise the innovation is exactly 0 and they stay
+    // identical, which is why Release measures exactly 0. 1e-12·‖x‖ is ~36× over the floor.
+    ASSERT_CHECK(obs_err <= 1e-12 * state_err, "observer should track true state to round-off");
     printf("  PASSED\n");
 }
 
