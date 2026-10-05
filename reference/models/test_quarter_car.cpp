@@ -29,6 +29,8 @@ void test_natural_frequencies() {
     // The actual eigenfrequencies will differ from these approximations because
     // of coupling, but should be in the right ballpark
     // Body mode: expect 1-2 Hz
+    // Plausibility bands for a passenger-car quarter model: body bounce ~1-1.5 Hz,
+    // wheel hop ~10-15 Hz. Measured 1.21 Hz and 11.2 Hz (Release).
     ASSERT_CHECK(freqs_hz[0] > 0.5 && freqs_hz[0] < 3.0, "body bounce frequency out of expected range");
     // Wheel hop mode: expect 8-15 Hz
     ASSERT_CHECK(freqs_hz[2] > 5.0 && freqs_hz[2] < 20.0, "wheel hop frequency out of expected range");
@@ -77,12 +79,14 @@ void test_bump_response() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B_w * bump_height;
 
     double err = (x_final - x_ss).norm();
+    // TODO(#75): tolerance unjustified — measured err = 2.6e-10 (Release), so 0.01 is ~1e7x
+    // looser than the observed settling error.
     ASSERT_CHECK(err < 0.01, "bump response did not settle to steady state");
 
     // Steady-state body position should equal bump height (body rises to road level)
     // x_ss(0) = z_b should be approximately bump_height
-    // 0.001: x_ss from -A⁻¹B_w*z_r; 4×4 well-conditioned system, A.inverse() accurate
-    // to ~1e-12; generous bound for this static body-road equality.
+    // TODO(#75): tolerance unjustified — x_ss comes from a static 4x4 solve; measured
+    // error is 6.9e-18 (Release), so 0.001 is ~1e14x looser than achieved.
     ASSERT_CHECK(std::abs(x_ss(0) - bump_height) < 0.001,
                  "steady-state body position does not match bump height");
 

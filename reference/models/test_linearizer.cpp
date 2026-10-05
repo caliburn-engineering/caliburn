@@ -82,10 +82,11 @@ static void test_ball_balancer_linearization() {
     auto result = validate(analytical, f, x0, u0, 1e-6);
 
     ASSERT_CHECK(result.pass, "ball-balancer validation must pass");
+    // TODO(#75): tolerance unjustified — A is linear in the state, so central differences are
+    // exact up to round-off; measured max_A_error = 0 (Release).
     ASSERT_CHECK(result.max_A_error < 1e-8, "max A error must be < 1e-8");
-    // 1e-6: sin linearization at u0=0 via central diff; d(sin(u))/du|_{u=0}=1 is the
-    // exact derivative, but numerical step introduces truncation O(h²) ~ 1e-10 and
-    // round-off; generous bound for this smooth, well-scaled function.
+    // TODO(#75): tolerance unjustified — sin linearization at u0=0 via central diff;
+    // measured max_B_error = 1.2e-12 (Release), so 1e-6 is ~1e6x looser than achieved.
     ASSERT_CHECK(result.max_B_error < 1e-6, "max B error must be < 1e-6 (sin linearization via central diff)");
 
     std::printf("  [PASS] Ball-balancer analytical vs numerical (max_A=%.2e, max_B=%.2e)\n",
@@ -138,8 +139,8 @@ static void test_nonzero_operating_point() {
     auto sys = linearize(f, x0, u0);
 
     // A(0,0) = -4.0 — magnitude > 1, so ASSERT_REL_NEAR would be looser.
-    // 1e-6: central diff of -x² at x=2; derivative is polynomial, recoverable to ~1e-10;
-    // generous compared to achievable accuracy.
+    // TODO(#75): tolerance unjustified — central diff of -x² is exact up to round-off
+    // (~eps/h); measured error 1.2e-10 (Release), so 1e-6 is ~1e4x looser.
     ASSERT_CHECK(std::abs(sys.A(0, 0) - (-4.0)) < 1e-6, "A(0,0) = df/dx = -2*x0 = -4");
     ASSERT_REL_NEAR(sys.B(0, 0), 1.0, TOL);  // expected 1; scale = 1
 

@@ -131,6 +131,7 @@ void test_lqr_simulation() {
 
     Eigen::VectorXd x_final = caliburn::rk4_integrate(x0, 0.0, dt, steps, deriv);
 
+    // 0.01: convergence bound with ~15x margin; measured |x_final| = 6.7e-4 (Release).
     ASSERT_CHECK(x_final.norm() < 0.01,
                  "LQR did not stabilise the pendulum from small perturbation");
 

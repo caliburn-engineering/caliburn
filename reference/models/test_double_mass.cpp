@@ -140,6 +140,8 @@ void test_step_response_rk4() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B * F;
 
     double err = (x_final - x_ss).norm();
+    // TODO(#75): tolerance unjustified — measured err = 1.1e-8 (Release), so 0.01 is ~1e6x
+    // looser than the observed settling error.
     ASSERT_CHECK(err < 0.01, "step response did not converge to steady state");
 
     std::cout << "  [PASS] Test 4: Step response converges to analytical steady-state (err="
