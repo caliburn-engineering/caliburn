@@ -45,8 +45,9 @@ static void test_sim_time_accuracy() {
     // Pattern repeats. Total substeps should consume close to 1.6s minus residual accumulator.
     // sim_time + alpha*dt should reconstruct total elapsed time
     double reconstructed = ts.sim_time() + ts.alpha() * ts.dt();
-    // 1e-3: 100 frames of IEEE 754 substep subtraction; worst-case drift ≪ 1e-3;
-    //       reconstructed≈1.6 > 1, so ASSERT_REL_NEAR would scale threshold to 1.6×tol
+    // TODO(#75): tolerance unjustified — measured drift is 1.1e-15 (Release), so 1e-3 is
+    //       ~1e12x looser than achieved. reconstructed≈1.6 > 1, so ASSERT_REL_NEAR would
+    //       scale the threshold to 1.6×tol; kept as an absolute check.
     ASSERT_CHECK(std::abs(reconstructed - 1.6) < 0.001, "reconstructed time matches 1.6s input");
 
     std::printf("  [PASS] sim time accuracy over 100 frames\n");
