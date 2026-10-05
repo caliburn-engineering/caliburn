@@ -27,6 +27,8 @@ static void test_p_only_step_response() {
     }
 
     double error = std::fabs(setpoint - x);
+    // TODO(#75): tolerance unjustified — error decays as (1 - Kp*dt)^n = 0.98^1000 ~ 1.7e-9,
+    // so 0.01 is ~1e7x looser than the derivable error.
     ASSERT_CHECK(error < 0.01, "P-only convergence: error should be < 0.01 after 1000 steps");
     std::printf("  [PASS] P-only step response (error=%.6f)\n", error);
 }
@@ -51,6 +53,8 @@ static void test_pi_steady_state() {
     }
 
     double error = std::fabs(setpoint - x);
+    // TODO(#75): tolerance unjustified — measured error prints as 0.000000 in Release;
+    // 0.01 is a loose convergence bound, not derived from the closed-loop decay rate.
     ASSERT_CHECK(error < 0.01, "PI steady-state error should be < 0.01 after 5000 steps");
     std::printf("  [PASS] PI eliminates steady-state error (error=%.6f)\n", error);
 }
@@ -96,7 +100,9 @@ static void test_anti_windup() {
     }
 
     // Integral should be clamped, not at the unclamped value of ~10000
-    ASSERT_CHECK(pid.integral() < 1.0, "anti-windup: integral clamped to <= u_max/Ki = 1.0");
+    // 1.0: the clamp bound is u_max/Ki = 0.1; unclamped the integral would reach ~1000.
+    // Any threshold between the two separates clamped from unclamped.
+    ASSERT_CHECK(pid.integral() < 1.0, "anti-windup: integral must be clamped near u_max/Ki = 0.1, not wound up to ~1000");
 
     // Reverse: setpoint=0, measurement=2 => error = -2
     // P-term = -2.0, I-term = Ki * ~0.08 = ~0.8  =>  output < 0
