@@ -1,6 +1,6 @@
 #include "rolling_dynamics.h"
 
-#include <cassert>
+#include "assert_rel.h"
 #include <cmath>
 #include <cstdio>
 
@@ -26,8 +26,9 @@ static void test_level_plate() {
 
     auto d = dyn.derivatives(state, 0.0, 0.0);
 
-    assert(std::abs(d(2)) < TOL);  // ax = 0
-    assert(std::abs(d(3)) < TOL);  // ay = 0
+    // 1e-10: exact zero expected; guards floating-point rounding in sin(0)
+    ASSERT_REL_NEAR(d(2), 0.0, 1e-10);  // ax = 0
+    ASSERT_REL_NEAR(d(3), 0.0, 1e-10);  // ay = 0
     std::printf("  [PASS] Level plate — zero acceleration\n");
 }
 
@@ -42,8 +43,10 @@ static void test_rolling_factor() {
     auto d = dyn.derivatives(state, 0.0, beta);
 
     double expected_ax = (5.0 / 7.0) * G * std::sin(beta);
-    assert(std::abs(d(2) - expected_ax) < TOL);
-    assert(std::abs(d(3)) < TOL);  // no y-acceleration
+    // 1e-10: same expression evaluated in test and implementation; expected bit-exact
+    ASSERT_REL_NEAR(d(2), expected_ax, 1e-10);
+    // 1e-10: exact zero expected; no y-tilt applied
+    ASSERT_REL_NEAR(d(3), 0.0, 1e-10);  // no y-acceleration
     std::printf("  [PASS] Rolling factor 5/7 correct (ax=%.6f)\n", d(2));
 }
 
@@ -60,8 +63,9 @@ static void test_both_axes() {
 
     double expected_ax = (5.0 / 7.0) * G * std::sin(beta);
     double expected_ay = (5.0 / 7.0) * G * std::sin(alpha);
-    assert(std::abs(d(2) - expected_ax) < TOL);
-    assert(std::abs(d(3) - expected_ay) < TOL);
+    // 1e-10: same expression evaluated in test and implementation; expected bit-exact
+    ASSERT_REL_NEAR(d(2), expected_ax, 1e-10);
+    ASSERT_REL_NEAR(d(3), expected_ay, 1e-10);
     std::printf("  [PASS] Both axes tilted\n");
 }
 
@@ -78,9 +82,10 @@ static void test_rolling_friction() {
     auto d = dyn.derivatives(state, 0.0, 0.0);
 
     // Friction should decelerate (negative ax)
-    assert(d(2) < 0.0);
+    ASSERT_CHECK(d(2) < 0.0, "rolling friction must decelerate the ball");
     double expected = -(5.0 / 7.0) * 0.005 * G;
-    assert(std::abs(d(2) - expected) < TOL);
+    // 1e-10: same expression evaluated in test and implementation; expected bit-exact
+    ASSERT_REL_NEAR(d(2), expected, 1e-10);
     std::printf("  [PASS] Rolling friction decelerates (ax=%.6f)\n", d(2));
 }
 
@@ -91,13 +96,13 @@ static void test_on_plate() {
     auto dyn = make_default();
 
     Eigen::Vector4d inside(0.1, 0.1, 0.0, 0.0);
-    assert(dyn.on_plate(inside));
+    ASSERT_CHECK(dyn.on_plate(inside), "point inside plate bounds should be on plate");
 
     Eigen::Vector4d outside(0.2, 0.0, 0.0, 0.0);
-    assert(!dyn.on_plate(outside));
+    ASSERT_CHECK(!dyn.on_plate(outside), "point outside plate bounds should not be on plate");
 
     Eigen::Vector4d edge(0.15, 0.0, 0.0, 0.0);
-    assert(!dyn.on_plate(edge));  // at boundary = off plate
+    ASSERT_CHECK(!dyn.on_plate(edge), "point at boundary should not be on plate");
 
     std::printf("  [PASS] Boundary detection\n");
 }
@@ -118,13 +123,14 @@ static void test_integration() {
     }
 
     // Ball should have moved in +x direction
-    assert(state(0) > 0.0);
-    assert(state(2) > 0.0);  // positive velocity
+    ASSERT_CHECK(state(0) > 0.0, "ball should move in +x direction under tilt");
+    ASSERT_CHECK(state(2) > 0.0, "ball should gain positive x-velocity under tilt");
 
     // Analytical: x = 0.5 * a * t^2, a = 5/7 * g * sin(beta)
     double a = (5.0 / 7.0) * G * std::sin(beta);
     double expected_x = 0.5 * a * 1.0;
-    assert(std::abs(state(0) - expected_x) < 0.01);
+    // 1e-2: Euler global error O(a·dt·T)≈2e-4 for a≈0.35, dt=1e-3, T=1s; loose sanity bound
+    ASSERT_REL_NEAR(state(0), expected_x, 1e-2);
     std::printf("  [PASS] Integration test (x=%.4f, expected=%.4f)\n", state(0), expected_x);
 }
 

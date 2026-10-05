@@ -1,6 +1,6 @@
 #include "fixed_timestep.h"
 
-#include <cassert>
+#include "assert_rel.h"
 #include <cmath>
 #include <cstdio>
 
@@ -8,10 +8,12 @@ static void test_exact_substep_count() {
     caliburn::FixedTimestep ts(0.01);
     int substeps = ts.accumulate(0.035, []() {});
 
-    assert(substeps == 3);
-    assert(std::abs(ts.sim_time() - 0.03) < 1e-9);
+    ASSERT_CHECK(substeps == 3, "3 substeps for 0.035s frame at 0.01s step");
+    // 1e-9: 3 exact subtractions of 0.01; IEEE 754 drift ≤ 3×2⁻⁵³ ≪ 1e-9
+    ASSERT_REL_NEAR(ts.sim_time(), 0.03, 1e-9);
     // accumulator should be ~0.005
-    assert(std::abs(ts.alpha() - 0.5) < 1e-9);
+    // 1e-9: alpha = (0.035 - 3×0.01)/0.01; single division; guards IEEE 754 rounding
+    ASSERT_REL_NEAR(ts.alpha(), 0.5, 1e-9);
 
     std::printf("  [PASS] exact substep count\n");
 }
@@ -23,9 +25,9 @@ static void test_frame_time_clamping() {
     // max_frame_dt=0.25 → accumulator clamped to 0.25
     // Due to IEEE 754 drift after repeated subtraction, we get 24 substeps
     // (residual ~0.00999... < dt). The key invariant: far fewer than 100 substeps.
-    assert(substeps <= 25 && substeps >= 24);
-    assert(substeps < 100);  // spiral of death prevented
-    assert(ts.sim_time() < 0.26);
+    ASSERT_CHECK(substeps <= 25 && substeps >= 24, "24-25 substeps when frame clamped to 0.25s");
+    ASSERT_CHECK(substeps < 100, "spiral of death prevented");
+    ASSERT_CHECK(ts.sim_time() < 0.26, "sim time must not exceed clamped max frame time");
 
     std::printf("  [PASS] frame time clamping (spiral of death prevention)\n");
 }
@@ -43,7 +45,9 @@ static void test_sim_time_accuracy() {
     // Pattern repeats. Total substeps should consume close to 1.6s minus residual accumulator.
     // sim_time + alpha*dt should reconstruct total elapsed time
     double reconstructed = ts.sim_time() + ts.alpha() * ts.dt();
-    assert(std::abs(reconstructed - 1.6) < 0.001);
+    // 1e-3: 100 frames of IEEE 754 substep subtraction; worst-case drift ≪ 1e-3;
+    //       reconstructed≈1.6 > 1, so ASSERT_REL_NEAR would scale threshold to 1.6×tol
+    ASSERT_CHECK(std::abs(reconstructed - 1.6) < 0.001, "reconstructed time matches 1.6s input");
 
     std::printf("  [PASS] sim time accuracy over 100 frames\n");
 }
@@ -53,9 +57,10 @@ static void test_alpha_interpolation() {
     ts.accumulate(0.035, []() {});
 
     double a = ts.alpha();
-    assert(a >= 0.0 && a < 1.0);
+    ASSERT_CHECK(a >= 0.0 && a < 1.0, "alpha must lie in [0, 1)");
     // accumulator = 0.005, dt = 0.01 → alpha = 0.5
-    assert(std::abs(a - 0.5) < 1e-9);
+    // 1e-9: alpha = 0.005/0.01; single division; guards IEEE 754 rounding
+    ASSERT_REL_NEAR(a, 0.5, 1e-9);
 
     std::printf("  [PASS] alpha interpolation\n");
 }
@@ -63,11 +68,11 @@ static void test_alpha_interpolation() {
 static void test_zero_frame_dt() {
     caliburn::FixedTimestep ts(0.01);
     int substeps = ts.accumulate(0.0, []() {
-        assert(false && "step_fn should not be called with zero frame_dt");
+        ASSERT_CHECK(false, "step_fn must not be called with zero frame_dt");
     });
 
-    assert(substeps == 0);
-    assert(ts.sim_time() == 0.0);
+    ASSERT_CHECK(substeps == 0, "zero frame_dt should produce zero substeps");
+    ASSERT_CHECK(ts.sim_time() == 0.0, "sim_time must stay zero with zero frame_dt");
 
     std::printf("  [PASS] zero frame_dt\n");
 }
