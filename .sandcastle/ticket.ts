@@ -41,6 +41,12 @@ const TICKETS: Record<number, { repo: "caliburn" | "bb"; slug: string }> = {
   67: { repo: "caliburn", slug: "golden-smc" },
   68: { repo: "caliburn", slug: "golden-luenberger" },
   69: { repo: "caliburn", slug: "golden-trajectory" },
+  76: { repo: "caliburn", slug: "release-assert-guard" },
+  77: { repo: "caliburn", slug: "asserts-controllers" },
+  78: { repo: "caliburn", slug: "asserts-models" },
+  79: { repo: "caliburn", slug: "asserts-simulation" },
+  80: { repo: "caliburn", slug: "asserts-vehicle-dynamics" },
+  81: { repo: "caliburn", slug: "asserts-rest" },
 };
 
 const n = Number(process.argv[2]);
