@@ -1,6 +1,6 @@
 #include "servo_model.h"
 
-#include <cassert>
+#include "assert_rel.h"
 #include <cmath>
 #include <cstdio>
 
@@ -25,7 +25,8 @@ static void test_step_response() {
     }
 
     double error = std::abs(servo.angle() - target);
-    assert(error < target * 0.02);  // within 2%
+    // 2%: first-order lag residual at 5τ is e^{-5}≈0.67%; 2% gives margin for dt=1ms discretisation
+    ASSERT_CHECK(error < target * 0.02, "step response should be within 2% of target after 5 time constants");
     std::printf("  [PASS] Step response converges (error=%.6f rad)\n", error);
 }
 
@@ -46,7 +47,8 @@ static void test_time_constant() {
 
     double expected = target * (1.0 - std::exp(-1.0));  // 0.6321
     double error = std::abs(servo.angle() - expected);
-    assert(error < 0.01);
+    // 1e-2: Euler integration of first-order lag over τ=0.1s with dt=1e-4; global error O(dt/τ)≈1e-3
+    ASSERT_CHECK(error < 0.01, "angle after 1 time constant should be within 0.01 rad of 63.2% of target");
     std::printf("  [PASS] Time constant check (angle=%.4f, expected=%.4f)\n",
                 servo.angle(), expected);
 }
@@ -61,7 +63,8 @@ static void test_velocity_saturation() {
     // Large step: error/tau = 1.0/0.01 = 100 rad/s >> omega_max
     servo.step(1.0, 0.001);
 
-    assert(std::abs(servo.angular_velocity()) <= 5.0 + 1e-10);
+    // 1e-10: velocity clamp adds floating-point tolerance; effective bound is omega_max
+    ASSERT_CHECK(std::abs(servo.angular_velocity()) <= 5.0 + 1e-10, "angular velocity must not exceed omega_max");
     std::printf("  [PASS] Velocity saturation (omega=%.4f)\n", servo.angular_velocity());
 }
 
@@ -77,7 +80,8 @@ static void test_position_clamping() {
         servo.step(2.0, dt);  // command 2.0 rad, limit is 0.5
     }
 
-    assert(servo.angle() <= 0.5 + 1e-10);
+    // 1e-10: position clamp adds floating-point tolerance; effective bound is angle_max
+    ASSERT_CHECK(servo.angle() <= 0.5 + 1e-10, "servo position must not exceed position limit");
     std::printf("  [PASS] Position clamping (angle=%.4f)\n", servo.angle());
 }
 
@@ -90,12 +94,13 @@ static void test_dead_zone() {
 
     // Command within dead zone
     servo.step(0.01, 0.01);
-    assert(std::abs(servo.angle()) < 1e-10);
-    assert(std::abs(servo.angular_velocity()) < 1e-10);
+    // 1e-10: no motion in dead zone; state should remain at exact zero
+    ASSERT_REL_NEAR(servo.angle(), 0.0, 1e-10);
+    ASSERT_REL_NEAR(servo.angular_velocity(), 0.0, 1e-10);
 
     // Command outside dead zone
     servo.step(0.1, 0.01);
-    assert(servo.angular_velocity() > 0.0);
+    ASSERT_CHECK(servo.angular_velocity() > 0.0, "velocity positive outside dead zone");
     std::printf("  [PASS] Dead zone\n");
 }
 
@@ -107,11 +112,11 @@ static void test_reset() {
     ServoModel servo(p);
 
     servo.step(1.0, 0.01);
-    assert(servo.angle() != 0.0);
+    ASSERT_CHECK(servo.angle() != 0.0, "angle must change after a step command");
 
     servo.reset(0.5);
-    assert(servo.angle() == 0.5);
-    assert(servo.angular_velocity() == 0.0);
+    ASSERT_CHECK(servo.angle() == 0.5, "angle set to exact reset value");
+    ASSERT_CHECK(servo.angular_velocity() == 0.0, "velocity zeroed by reset");
     std::printf("  [PASS] Reset\n");
 }
 

@@ -1,6 +1,6 @@
 #include "constraint_enforcer.h"
 
-#include <cassert>
+#include "assert_rel.h"
 #include <cmath>
 #include <cstdio>
 
@@ -19,9 +19,9 @@ static void test_within_limits() {
 
     int active = ce.enforce(state);
 
-    assert(active == 0);
-    assert(state(0) == 0.5);
-    assert(state(1) == 2.0);
+    ASSERT_CHECK(active == 0, "no constraints active when position is within limits");
+    ASSERT_CHECK(state(0) == 0.5, "position unchanged when within limits");
+    ASSERT_CHECK(state(1) == 2.0, "velocity unchanged when within limits");
     std::printf("  [PASS] Within limits — no change\n");
 }
 
@@ -37,9 +37,9 @@ static void test_exceeds_max() {
 
     int active = ce.enforce(state);
 
-    assert(active == 1);
-    assert(state(0) == 1.0);
-    assert(state(1) == 0.0);
+    ASSERT_CHECK(active == 1, "one constraint active when position exceeds max");
+    ASSERT_CHECK(state(0) == 1.0, "position clamped to max limit");
+    ASSERT_CHECK(state(1) == 0.0, "velocity zeroed when position clamped at max");
     std::printf("  [PASS] Exceeds max — position clamped, velocity zeroed\n");
 }
 
@@ -55,9 +55,9 @@ static void test_below_min() {
 
     int active = ce.enforce(state);
 
-    assert(active == 1);
-    assert(state(0) == -1.0);
-    assert(state(1) == 0.0);
+    ASSERT_CHECK(active == 1, "one constraint active when position below min");
+    ASSERT_CHECK(state(0) == -1.0, "position clamped to min limit");
+    ASSERT_CHECK(state(1) == 0.0, "velocity zeroed when position clamped at min");
     std::printf("  [PASS] Below min — position clamped, velocity zeroed\n");
 }
 
@@ -73,9 +73,10 @@ static void test_velocity_saturation() {
 
     int active = ce.enforce(state);
 
-    assert(active == 1);
-    assert(state(0) == 0.5);
-    assert(std::abs(state(1) - 5.0) < 1e-12);
+    ASSERT_CHECK(active == 1, "one constraint active during velocity saturation");
+    ASSERT_CHECK(state(0) == 0.5, "position unchanged during velocity saturation");
+    // 1e-12: single clamp assignment; magnitude ~5.0 > 1 so ASSERT_REL_NEAR would be looser
+    ASSERT_CHECK(std::abs(state(1) - 5.0) < 1e-12, "velocity clamped to max_velocity");
     std::printf("  [PASS] Velocity saturation\n");
 }
 
@@ -94,11 +95,11 @@ static void test_multiple_joints() {
 
     int active = ce.enforce(state);
 
-    assert(active == 2);
-    assert(state(0) == 0.5);
-    assert(state(1) == -0.3);
-    assert(state(2) == 0.0);
-    assert(state(3) == 0.0);
+    ASSERT_CHECK(active == 2, "two constraints active when both joints violated");
+    ASSERT_CHECK(state(0) == 0.5, "joint 0 position clamped to max");
+    ASSERT_CHECK(state(1) == -0.3, "joint 1 position clamped to min");
+    ASSERT_CHECK(state(2) == 0.0, "joint 0 velocity zeroed at limit");
+    ASSERT_CHECK(state(3) == 0.0, "joint 1 velocity zeroed at limit");
     std::printf("  [PASS] Multiple joints constrained\n");
 }
 
@@ -106,9 +107,9 @@ static void test_multiple_joints() {
 // 6. Static clamp utility
 // ---------------------------------------------------------------------------
 static void test_clamp() {
-    assert(ConstraintEnforcer::clamp(5.0, -1.0, 1.0) == 1.0);
-    assert(ConstraintEnforcer::clamp(-5.0, -1.0, 1.0) == -1.0);
-    assert(ConstraintEnforcer::clamp(0.5, -1.0, 1.0) == 0.5);
+    ASSERT_CHECK(ConstraintEnforcer::clamp(5.0, -1.0, 1.0) == 1.0, "value above max clamped to max");
+    ASSERT_CHECK(ConstraintEnforcer::clamp(-5.0, -1.0, 1.0) == -1.0, "value below min clamped to min");
+    ASSERT_CHECK(ConstraintEnforcer::clamp(0.5, -1.0, 1.0) == 0.5, "value within range unchanged");
     std::printf("  [PASS] Static clamp\n");
 }
 
