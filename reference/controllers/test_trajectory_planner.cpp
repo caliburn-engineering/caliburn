@@ -1,7 +1,6 @@
 #include "trajectory_planner.h"
 #include "assert_rel.h"
 
-#include <cassert>
 #include <cmath>
 #include <cstdio>
 
@@ -15,10 +14,12 @@ static constexpr double TOL = 1e-10;
 static void test_cubic_boundary_conditions() {
     CubicTrajectory traj(1.0, 0.5, 3.0, -0.5, 2.0);
 
-    assert(std::abs(traj.position(0.0) - 1.0) < TOL);
-    assert(std::abs(traj.velocity(0.0) - 0.5) < TOL);
-    assert(std::abs(traj.position(2.0) - 3.0) < TOL);
-    assert(std::abs(traj.velocity(2.0) - (-0.5)) < TOL);
+    // 1e-10: cubic coefficients from 4×4 linear solve; rounding ≤ O(cond)×2⁻⁵³ ≈ 1e-14; 1e-10 adds ~10⁴× margin
+    ASSERT_REL_NEAR(traj.position(0.0), 1.0,   TOL);   // |expected|=1 ≤ 1: relative scale = 1
+    ASSERT_REL_NEAR(traj.velocity(0.0), 0.5,   TOL);   // |expected|=0.5 ≤ 1
+    ASSERT_CHECK(std::abs(traj.position(2.0) - 3.0) < TOL,   // |expected|=3 > 1: ASSERT_REL_NEAR would be 3× looser
+                 "cubic position at t=2 must equal qf=3.0 to within 1e-10");
+    ASSERT_REL_NEAR(traj.velocity(2.0), -0.5,  TOL);   // |expected|=0.5 ≤ 1
     std::printf("  [PASS] Cubic boundary conditions\n");
 }
 
@@ -28,9 +29,10 @@ static void test_cubic_boundary_conditions() {
 static void test_cubic_rest_to_rest() {
     CubicTrajectory traj(0.0, 0.0, 1.0, 0.0, 1.0);
 
-    assert(std::abs(traj.velocity(0.0)) < TOL);
-    assert(std::abs(traj.velocity(1.0)) < TOL);
-    assert(std::abs(traj.position(1.0) - 1.0) < TOL);
+    // 1e-10: same 4×4 solve as above; boundary velocity = 0 so absolute and relative thresholds coincide
+    ASSERT_REL_NEAR(traj.velocity(0.0), 0.0, TOL);
+    ASSERT_REL_NEAR(traj.velocity(1.0), 0.0, TOL);
+    ASSERT_REL_NEAR(traj.position(1.0), 1.0, TOL);  // |expected|=1 ≤ 1
     std::printf("  [PASS] Cubic rest-to-rest\n");
 }
 
@@ -40,12 +42,15 @@ static void test_cubic_rest_to_rest() {
 static void test_minjerk_boundary_conditions() {
     MinJerkTrajectory traj(0.0, 2.0, 1.0);
 
-    assert(std::abs(traj.position(0.0) - 0.0) < TOL);
-    assert(std::abs(traj.position(1.0) - 2.0) < TOL);
-    assert(std::abs(traj.velocity(0.0)) < TOL);
-    assert(std::abs(traj.velocity(1.0)) < TOL);
-    assert(std::abs(traj.acceleration(0.0)) < TOL);
-    assert(std::abs(traj.acceleration(1.0)) < TOL);
+    // 1e-10: min-jerk coefficients from 6-condition linear solve (T=1, all params O(1));
+    //        rounding ≤ O(cond)×2⁻⁵³ ≈ 1e-13; 1e-10 adds ~1000× margin
+    ASSERT_REL_NEAR(traj.position(0.0), 0.0, TOL);   // compare to 0: absolute ≡ relative
+    ASSERT_CHECK(std::abs(traj.position(1.0) - 2.0) < TOL,   // |expected|=2 > 1: ASSERT_REL_NEAR would be 2× looser
+                 "min-jerk position at t=T must equal qf=2.0 to within 1e-10");
+    ASSERT_REL_NEAR(traj.velocity(0.0),     0.0, TOL);
+    ASSERT_REL_NEAR(traj.velocity(1.0),     0.0, TOL);
+    ASSERT_REL_NEAR(traj.acceleration(0.0), 0.0, TOL);
+    ASSERT_REL_NEAR(traj.acceleration(1.0), 0.0, TOL);
     std::printf("  [PASS] MinJerk boundary conditions\n");
 }
 
@@ -60,9 +65,10 @@ static void test_minjerk_peak_velocity() {
     double v_quarter = traj.velocity(0.25);
     double v_three_quarter = traj.velocity(0.75);
 
-    assert(v_mid > v_quarter);
-    assert(v_mid > v_three_quarter);
-    assert(std::abs(v_quarter - v_three_quarter) < TOL);  // symmetric
+    ASSERT_CHECK(v_mid > v_quarter, "min-jerk peak velocity must be at midpoint, greater than v(T/4)");
+    ASSERT_CHECK(v_mid > v_three_quarter, "min-jerk peak velocity must be at midpoint, greater than v(3T/4)");
+    // v_quarter ≈ v_three_quarter ≈ 0.94 ≤ 1, so relative scale = 1 and absolute threshold equals ASSERT_REL_NEAR
+    ASSERT_REL_NEAR(v_quarter, v_three_quarter, TOL);  // symmetric about midpoint; |values| < 1
     std::printf("  [PASS] MinJerk peak velocity at midpoint (v=%.4f)\n", v_mid);
 }
 
@@ -73,9 +79,12 @@ static void test_trapezoidal_reaches_target() {
     TrapezoidalTrajectory traj(0.0, 10.0, 2.0, 1.0);
 
     double T = traj.duration();
-    assert(std::abs(traj.position(T) - 10.0) < 1e-8);
-    assert(std::abs(traj.velocity(0.0)) < TOL);
-    assert(std::abs(traj.velocity(T)) < TOL);
+    // |expected|=10 > 1: ASSERT_REL_NEAR would allow 10× larger error; keep absolute bound
+    // 1e-8: piecewise quadratic; O(1) floating-point operations; rounding ≈ 1e-16; 1e-8 is a loose sanity check
+    ASSERT_CHECK(std::abs(traj.position(T) - 10.0) < 1e-8,
+                 "trapezoidal position at T must equal qf=10.0 to within 1e-8");
+    ASSERT_REL_NEAR(traj.velocity(0.0), 0.0, TOL);  // rest start: absolute ≡ relative
+    ASSERT_REL_NEAR(traj.velocity(T),   0.0, TOL);  // rest end
     std::printf("  [PASS] Trapezoidal reaches target (T=%.4f)\n", T);
 }
 
@@ -87,11 +96,12 @@ static void test_trapezoidal_triangular() {
     TrapezoidalTrajectory traj(0.0, 0.5, 10.0, 1.0);
 
     double T = traj.duration();
-    assert(std::abs(traj.position(T) - 0.5) < 1e-8);
+    // |expected|=0.5 ≤ 1: relative scale = max(0.5, 0.5, 1) = 1; 1e-8 threshold same as absolute
+    ASSERT_REL_NEAR(traj.position(T), 0.5, 1e-8);  // 1e-8: piecewise quadratic with few operations
     // Peak velocity should be less than v_max
     double v_peak = traj.velocity(T / 2.0);
-    assert(v_peak < 10.0);
-    assert(v_peak > 0.0);
+    ASSERT_CHECK(v_peak < 10.0, "triangular: peak velocity must be less than v_max=10");
+    ASSERT_CHECK(v_peak > 0.0,  "triangular: peak velocity must be positive (forward motion)");
     std::printf("  [PASS] Trapezoidal triangular profile (v_peak=%.4f)\n", v_peak);
 }
 
@@ -102,10 +112,11 @@ static void test_trapezoidal_reverse() {
     TrapezoidalTrajectory traj(5.0, 0.0, 2.0, 1.0);
 
     double T = traj.duration();
-    assert(std::abs(traj.position(T) - 0.0) < 1e-8);
+    // comparing to 0: absolute and relative thresholds coincide (scale floor = 1)
+    ASSERT_REL_NEAR(traj.position(T), 0.0, 1e-8);  // 1e-8: piecewise quadratic with few operations
     // Velocity should be negative
     double v_mid = traj.velocity(T / 2.0);
-    assert(v_mid < 0.0);
+    ASSERT_CHECK(v_mid < 0.0, "trapezoidal reverse: mid-trajectory velocity must be negative");
     std::printf("  [PASS] Trapezoidal reverse direction\n");
 }
 

@@ -1,6 +1,5 @@
 #include "smc.h"
 #include "assert_rel.h"
-#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <vector>
@@ -69,8 +68,8 @@ void test_sign_convergence() {
     // After 5 seconds with lambda=2, state should be near origin
     double final_pos = std::abs(res.position.back());
     double final_vel = std::abs(res.velocity.back());
-    assert(final_pos < 0.05 && "Position should converge near zero");
-    assert(final_vel < 0.05 && "Velocity should converge near zero");
+    ASSERT_CHECK(final_pos < 0.05, "Position should converge near zero");
+    ASSERT_CHECK(final_vel < 0.05, "Velocity should converge near zero");
 
     std::cout << "PASSED (final pos=" << final_pos << ", vel=" << final_vel << ")\n";
 }
@@ -101,8 +100,8 @@ void test_boundary_layer_chattering() {
         if (bl_res.control[i] * bl_res.control[i-1] < 0) sign_changes_bl++;
     }
 
-    assert(sign_changes_bl < sign_changes_sign &&
-           "Boundary layer should have fewer sign changes than pure sign");
+    ASSERT_CHECK(sign_changes_bl < sign_changes_sign,
+                 "Boundary layer should have fewer sign changes than pure sign");
 
     std::cout << "PASSED (sign changes: sign=" << sign_changes_sign
               << ", boundary=" << sign_changes_bl << ")\n";
@@ -124,8 +123,8 @@ void test_super_twisting() {
     // Check convergence
     double final_pos = std::abs(res.position.back());
     double final_vel = std::abs(res.velocity.back());
-    assert(final_pos < 0.1 && "Super-twisting should converge");
-    assert(final_vel < 0.1 && "Super-twisting velocity should converge");
+    ASSERT_CHECK(final_pos < 0.1, "Super-twisting should converge");
+    ASSERT_CHECK(final_vel < 0.1, "Super-twisting velocity should converge");
 
     // Check control continuity: max |u[i] - u[i-1]| should be small
     double max_jump = 0.0;
@@ -134,7 +133,7 @@ void test_super_twisting() {
         if (jump > max_jump) max_jump = jump;
     }
     // For sign mode with K=5, jumps would be ~10. Super-twisting should be much less.
-    assert(max_jump < 2.0 && "Super-twisting control should be approximately continuous");
+    ASSERT_CHECK(max_jump < 2.0, "Super-twisting control should be approximately continuous");
 
     std::cout << "PASSED (final pos=" << final_pos << ", max_jump=" << max_jump << ")\n";
 }
@@ -154,8 +153,8 @@ void test_robustness() {
         auto res = simulate(ctrl, d, 1.0, 0.5);
 
         double final_pos = std::abs(res.position.back());
-        assert(final_pos < 0.15 &&
-               "System should converge for any disturbance < K");
+        ASSERT_CHECK(final_pos < 0.15,
+                     "System should converge for any disturbance < K");
     }
 
     std::cout << "PASSED (converges for d in {0, 1, 2, 3, 5, 8} with K=10)\n";
@@ -175,8 +174,8 @@ void test_failure_exceeds_bound() {
 
     // State should drift away from origin (disturbance dominates)
     double final_pos = std::abs(res.position.back());
-    assert(final_pos > 1.0 &&
-           "System should diverge when disturbance exceeds switching gain");
+    ASSERT_CHECK(final_pos > 1.0,
+                 "System should diverge when disturbance exceeds switching gain");
 
     std::cout << "PASSED (final pos=" << final_pos << " — diverged as expected)\n";
 }
