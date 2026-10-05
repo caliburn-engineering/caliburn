@@ -51,6 +51,7 @@ const TICKETS: Record<number, { repo: "caliburn" | "bb"; slug: string }> = {
   92: { repo: "caliburn", slug: "tol-controllers" },
   93: { repo: "caliburn", slug: "tol-models" },
   94: { repo: "caliburn", slug: "tol-simulation" },
+  95: { repo: "caliburn", slug: "tol-vehicle-dynamics" },
 };
 
 const n = Number(process.argv[2]);
