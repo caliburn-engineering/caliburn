@@ -114,11 +114,13 @@ void test_riccati_residual() {
                              - P * B * Rinv_Bt * P + Q;
 
     double residual_norm = residual.norm();
-    // 4×4 Hamiltonian eigendecomposition: backward error per H-entry ≈ n²·u·‖H‖_F ≈ 1e-14;
-    // P-entry error ε_P ≈ κ(V)·1e-14 ≈ 1e-13 (κ(V) ≈ O(10) for this well-conditioned system);
-    // residual sensitivity per element ≈ ‖A‖+‖PBBᵀ‖ ≈ 3; ‖residual‖_F ≤ √4·3·1e-13 ≈ 6e-13;
-    // 1e-11 adds ~20× safety.
-    ASSERT_CHECK(residual_norm < 1e-11, "lqr: Riccati equation residual too large");
+    // Closed form for this plant: P = [[√3, 1], [1, √3]], so |P| entries ≤ √3.
+    // The 4×4 Hamiltonian H has ‖H‖_F = √6. A backward-stable eigensolver perturbs it by
+    // ≈ n·u·‖H‖_F ≈ 4·1.1e-16·2.45 ≈ 1e-15, and the stable-subspace basis X1 (κ(X1) = 2+√3 ≈ 3.7)
+    // carries that into P: |δP| ≈ 4e-15. The residual's sensitivity to P is
+    // ‖Aᵀ‖ + ‖A‖ + 2‖P B R⁻¹ Bᵀ‖ ≈ 1 + 1 + 2·2 ≈ 6, giving ≈ 2.4e-14. Forming the residual
+    // (products of O(√3) entries) adds a few u·‖P‖² ≈ 1e-15. 1e-12 is ~40× over the sum.
+    ASSERT_CHECK(residual_norm < 1e-12, "lqr: Riccati equation residual too large");
 
     std::cout << "  [PASS] Test 3: Riccati equation residual = "
               << residual_norm << "\n";

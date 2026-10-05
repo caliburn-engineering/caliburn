@@ -28,10 +28,15 @@ static void test_p_only_step_response() {
     }
 
     double error = std::fabs(setpoint - x);
-    // P-only on integrator plant: error_k = (1 − Kp·dt)^k = 0.98^1000 ≈ 1.7e-9 (exact analytic decay).
-    // Floating-point per-step roundoff ≤ 3·u propagated through 0.98 contraction:
-    // ε_fp ≤ 3·u/(1−0.98) ≈ 3.3e-14 (negligible). 5e-9 gives ~3× margin.
-    ASSERT_CHECK(error < 5e-9, "P-only convergence: error should be < 5e-9 after 1000 steps");
+    // P-only on an integrator plant: e_{k+1} = (1 - Kp·dt)·e_k with e_0 = 1, so after 1000
+    // steps the error is exactly (1 - Kp·dt)^1000 = 0.98^1000 ≈ 1.68e-9; compare against
+    // that closed form, not just "small".
+    // Round-off: each step rounds u and x at O(1) magnitude (≤ 3u, u = 2^-53 ≈ 1.1e-16), and
+    // the 0.98 contraction sums it geometrically: ≤ 3u/(1 - 0.98) ≈ 1.7e-14. 1e-13 is ~6×.
+    // A 5% change in the P gain moves the error to ~4.7e-9 and fails this check.
+    const double expected = std::pow(1.0 - 2.0 * dt, 1000);
+    ASSERT_CHECK(std::fabs(error - expected) < 1e-13,
+                 "P-only convergence: error should equal (1 - Kp*dt)^1000 to round-off");
     std::printf("  [PASS] P-only step response (error=%.6f)\n", error);
 }
 
@@ -55,10 +60,13 @@ static void test_pi_steady_state() {
     }
 
     double error = std::fabs(setpoint - x);
-    // Discrete closed-loop eigenvalue magnitude ≈ 0.9926 (poles of A_d = I+dt·A_cl);
-    // transient after 5000 steps: 0.9926^5000 ≈ 6.5e-17; floating-point roundoff accumulated
-    // ≤ 5·u·5000/(1−0.9926) ≈ 1e-11 (geometric sum); 1e-10 gives 10× margin.
-    ASSERT_CHECK(error < 1e-10, "PI steady-state error should be < 1e-10 after 5000 steps");
+    // Deviation dynamics (x, integral) per step are linear: A_d = [[1 - 1.5·dt - 2·dt², 2·dt],
+    // [-dt, 1]], with complex eigenvalues |λ| = 0.99247 and eigenvector condition number κ ≈ 2.0.
+    // Transient after 5000 steps: κ·|λ|^5000 ≈ 2·3.9e-17 ≈ 8e-17 (from an O(1) initial error).
+    // Round-off: ≤ 5u per step at O(1) magnitudes, summed geometrically: κ·5u/(1 - |λ|) ≈ 1.5e-13.
+    // 1e-12 gives ~7× margin. A leaky integrator (integral *= 0.9999 each step) leaves
+    // a ~2.5e-3 offset that passed the old 0.01 bound and fails this one.
+    ASSERT_CHECK(error < 1e-12, "PI steady-state error should be < 1e-12 after 5000 steps");
     std::printf("  [PASS] PI eliminates steady-state error (error=%.6f)\n", error);
 }
 
