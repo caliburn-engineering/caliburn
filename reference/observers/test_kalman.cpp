@@ -1,6 +1,6 @@
 #include "kalman_filter.h"
 
-#include <cassert>
+#include "assert_rel.h"
 #include <cmath>
 #include <cstdio>
 #include <random>
@@ -68,9 +68,12 @@ void test_constant_velocity_tracking() {
     double avg_pos_error = pos_error_sum / 20.0;
     double avg_vel_estimate = vel_estimate_sum / 20.0;
 
-    assert(avg_pos_error < 0.5 && "Position estimate error should be < 0.5 after convergence");
-    assert(std::abs(avg_vel_estimate - true_velocity) < 1.0 &&
-           "Velocity estimate should converge near 5.0");
+    // 0.5 m: after 100 steps with measurement noise sigma=1; measured 0.168 m (Release), ~3x margin
+    ASSERT_CHECK(avg_pos_error < 0.5, "position estimate error should be < 0.5 after convergence");
+    // 1.0 m/s: magnitudes are O(5) > 1, so ASSERT_REL_NEAR would be 5x looser; measured
+    // velocity error 0.038 m/s (Release), ~25x margin
+    ASSERT_CHECK(std::abs(avg_vel_estimate - true_velocity) < 1.0,
+                 "velocity estimate should converge within 1.0 of true_velocity=5.0");
 
     std::printf("  [PASS] Test 1: Constant velocity 1D tracking\n");
 }
@@ -121,10 +124,11 @@ void test_covariance_convergence() {
     const Eigen::MatrixXd& P_final = kf.covariance();
 
     // Diagonal elements of P should have decreased from initial values
-    assert(P_final(0, 0) < P0(0, 0) &&
-           "P(0,0) should decrease from initial value");
-    assert(P_final(1, 1) < P0(1, 1) &&
-           "P(1,1) should decrease from initial value");
+    // P0(0,0)=10; each update step folds in measurement information, so covariance must shrink
+    ASSERT_CHECK(P_final(0, 0) < P0(0, 0),
+                 "P(0,0) should decrease from initial value: filter incorporates measurements");
+    ASSERT_CHECK(P_final(1, 1) < P0(1, 1),
+                 "P(1,1) should decrease from initial value: filter incorporates measurements");
 
     std::printf("  [PASS] Test 2: Covariance converges (steady-state)\n");
 }
@@ -183,8 +187,10 @@ void test_innovation_consistency() {
     double avg_innovation = innovation_abs_sum / static_cast<double>(tail_count);
     double three_sigma = 3.0 * std::sqrt(R(0, 0));
 
-    assert(avg_innovation < three_sigma &&
-           "Average innovation magnitude should be within 3-sigma of sqrt(R)");
+    // three_sigma = 3*sqrt(R) = 3; a consistent filter gives mean|innovation| of order sigma;
+    // measured 0.955 (Release)
+    ASSERT_CHECK(avg_innovation < three_sigma,
+                 "average innovation magnitude should be within 3-sigma of sqrt(R)");
 
     std::printf("  [PASS] Test 3: Innovation consistency\n");
 }

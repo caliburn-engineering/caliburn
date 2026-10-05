@@ -1,6 +1,6 @@
 #include "rk4.h"
 
-#include <cassert>
+#include "assert_rel.h"
 #include <cmath>
 #include <iostream>
 
@@ -22,7 +22,8 @@ void test_exponential_decay() {
     Eigen::VectorXd y = caliburn::rk4_integrate(y0, 0.0, h, steps, f);
     const double error = std::abs(y(0) - std::exp(-1.0));
 
-    assert(error < 1e-8);
+    // 1e-8: RK4 global error O(h^4·T) with h=0.01, T=1; measured 3.1e-11 (Release), ~300x margin
+    ASSERT_CHECK(error < 1e-8, "exponential decay: RK4 global error should be < 1e-8 at t=1 with h=0.01");
     std::cout << "  exponential decay   error = " << error << "  PASS\n";
 }
 
@@ -54,8 +55,10 @@ void test_harmonic_oscillator() {
     const double x_error = std::abs(y(0) - std::cos(t_end));
     const double v_error = std::abs(y(1) + std::sin(t_end));
 
-    assert(x_error < 1e-6);
-    assert(v_error < 1e-6);
+    // TODO(#75): tolerance unjustified — actual error ~5e-14 in Release; 1e-6 is ~1e8× loose, order-lowering mutations give ~5e-7 and still pass
+    ASSERT_CHECK(x_error < 1e-6, "harmonic oscillator: x error should be < 1e-6 at t_end");
+    // TODO(#75): tolerance unjustified — actual error ~5e-14 in Release; 1e-6 is ~1e8× loose, order-lowering mutations give ~5e-7 and still pass
+    ASSERT_CHECK(v_error < 1e-6, "harmonic oscillator: v error should be < 1e-6 at t_end");
     std::cout << "  harmonic oscillator x_err = " << x_error
               << "  v_err = " << v_error << "  PASS\n";
 }
@@ -85,7 +88,8 @@ void test_order_of_accuracy() {
 
     const double ratio = err_coarse / err_fine;
 
-    assert(ratio > 14.0 && ratio < 18.0);
+    // 14.0–18.0: 4th-order method predicts ratio = (0.1/0.05)^4 = 16; ±2 allows sub-leading-order terms
+    ASSERT_CHECK(ratio > 14.0 && ratio < 18.0, "order check: error ratio h=0.1 vs h=0.05 should be near 16 for 4th-order");
     std::cout << "  order of accuracy   ratio = " << ratio
               << " (expect ~16)  PASS\n";
 }

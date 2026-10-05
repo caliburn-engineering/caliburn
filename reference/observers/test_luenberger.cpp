@@ -3,7 +3,6 @@
 
 #include <Eigen/Eigenvalues>
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <complex>
@@ -79,7 +78,9 @@ void test_mass_spring_damper() {
     // After 5 seconds with poles at -20,-25, error should be negligible
     double err = obs.errorNorm(x_true);
     printf("Test 1 (mass-spring-damper): final error = %.6e\n", err);
-    assert(err < 1e-3 && "Observer should converge for mass-spring-damper");
+    // 1e-3: measured err = 4.6e-4 (Release), only ~2x margin. Not the e^{-100} a pure pole-decay
+    // estimate suggests, so a small change to this test or observer can tip it over.
+    ASSERT_CHECK(err < 1e-3, "observer should converge for mass-spring-damper");
     printf("  PASSED\n");
 }
 
@@ -149,8 +150,9 @@ void test_pole_speed_comparison() {
 
     // Faster poles should converge faster
     for (int i = 0; i < 3; ++i) {
-        assert(convergence_times[i+1] < convergence_times[i] &&
-               "Faster poles must converge faster");
+        // monotone: faster poles → smaller time constant → strictly earlier crossing of 5% threshold
+        ASSERT_CHECK(convergence_times[i+1] < convergence_times[i],
+                     "faster poles must converge faster: convergence time must be strictly monotone");
     }
 
     printf("Test 2 (pole speed comparison): PASSED\n");
@@ -224,8 +226,11 @@ void test_separation_principle() {
 
     printf("Test 3 (separation principle): true state norm = %.6e, "
            "observer error = %.6e\n", state_err, obs_err);
-    assert(state_err < 1e-3 && "True state should converge to origin");
-    assert(obs_err < 1e-4 && "Observer should track true state");
+    // TODO(#75): tolerance unjustified — measured state_err = 3.9e-8 (Release), so 1e-3 is
+    // ~1e4x looser than achieved.
+    ASSERT_CHECK(state_err < 1e-3, "true state should converge to origin");
+    // TODO(#75): tolerance unjustified — measured obs_err is exactly 0 (Release).
+    ASSERT_CHECK(obs_err < 1e-4, "observer should track true state");
     printf("  PASSED\n");
 }
 
@@ -287,7 +292,9 @@ void test_unobservable_mode() {
 
     printf("Test 4 (unobservable mode): err_state1 = %.6e, err_state2 = %.6e\n",
            err_state1, err_state2);
-    assert(err_state1 < 1e-3 && "Observable state should converge");
+    // 1e-3: measured err_state1 = 6.7e-6 (Release), ~150x margin (not the 2e-22 a pure pole-decay
+    // estimate suggests).
+    ASSERT_CHECK(err_state1 < 1e-3, "observable state should converge");
     // The unobservable state may or may not converge depending on open-loop stability
     // Key insight: observer gain L cannot accelerate convergence of unobservable mode
     printf("  PASSED (demonstrates unobservable mode limitation)\n");
