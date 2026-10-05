@@ -1,12 +1,13 @@
 #include "homogeneous_transform.h"
 
 #include <Eigen/Geometry>
-#include <cassert>
+#include "assert_rel.h"
 #include <cmath>
 #include <cstdio>
 
 using namespace caliburn;
 
+// 1e-10: rigid transform entries are O(1); worst case ~16 FP ops per multiply; rounding ≤ 16·2⁻⁵³ ≈ 2e-15
 static constexpr double TOL = 1e-10;
 
 static bool vec3_near(const Eigen::Vector3d& a, const Eigen::Vector3d& b, double tol = TOL) {
@@ -25,7 +26,7 @@ static void test_identity() {
     Eigen::Vector3d p(1.0, 2.0, 3.0);
 
     auto result = transform_point(I, p);
-    assert(vec3_near(result, p));
+    ASSERT_CHECK(vec3_near(result, p), "identity transform should preserve point within TOL");
     std::printf("  [PASS] Identity transform\n");
 }
 
@@ -37,11 +38,11 @@ static void test_translation() {
     Eigen::Vector3d p(0.0, 0.0, 0.0);
 
     auto result = transform_point(T, p);
-    assert(vec3_near(result, Eigen::Vector3d(1.0, 2.0, 3.0)));
+    ASSERT_CHECK(vec3_near(result, Eigen::Vector3d(1.0, 2.0, 3.0)), "translated point should equal offset within TOL");
 
     // Vector should NOT be translated
     auto v_result = transform_vector(T, Eigen::Vector3d(1.0, 0.0, 0.0));
-    assert(vec3_near(v_result, Eigen::Vector3d(1.0, 0.0, 0.0)));
+    ASSERT_CHECK(vec3_near(v_result, Eigen::Vector3d(1.0, 0.0, 0.0)), "translation should not affect direction vectors within TOL");
     std::printf("  [PASS] Pure translation\n");
 }
 
@@ -53,7 +54,7 @@ static void test_rot_z_90() {
     Eigen::Vector3d p(1.0, 0.0, 0.0);
 
     auto result = transform_point(T, p);
-    assert(vec3_near(result, Eigen::Vector3d(0.0, 1.0, 0.0)));
+    ASSERT_CHECK(vec3_near(result, Eigen::Vector3d(0.0, 1.0, 0.0)), "rot_z(90°) should map (1,0,0) to (0,1,0) within TOL");
     std::printf("  [PASS] Rotation about Z by 90°\n");
 }
 
@@ -65,7 +66,7 @@ static void test_rot_x_90() {
     Eigen::Vector3d p(0.0, 1.0, 0.0);
 
     auto result = transform_point(T, p);
-    assert(vec3_near(result, Eigen::Vector3d(0.0, 0.0, 1.0)));
+    ASSERT_CHECK(vec3_near(result, Eigen::Vector3d(0.0, 0.0, 1.0)), "rot_x(90°) should map (0,1,0) to (0,0,1) within TOL");
     std::printf("  [PASS] Rotation about X by 90°\n");
 }
 
@@ -82,7 +83,7 @@ static void test_compose() {
 
     auto result = transform_point(T, p);
     // Rotate (1,0,0) by 90° about Z → (0,1,0), then translate by (1,0,0) → (1,1,0)
-    assert(vec3_near(result, Eigen::Vector3d(1.0, 1.0, 0.0)));
+    ASSERT_CHECK(vec3_near(result, Eigen::Vector3d(1.0, 1.0, 0.0)), "composed transform should map (1,0,0) to (1,1,0) within TOL");
     std::printf("  [PASS] Composed transform (translate + rotate)\n");
 }
 
@@ -94,7 +95,7 @@ static void test_inverse() {
     Eigen::Matrix4d T_inv = inverse_transform(T);
     Eigen::Matrix4d product = T * T_inv;
 
-    assert(mat4_near(product, Eigen::Matrix4d::Identity()));
+    ASSERT_CHECK(mat4_near(product, Eigen::Matrix4d::Identity()), "T * T_inv should equal identity within TOL");
     std::printf("  [PASS] Inverse transform\n");
 }
 
@@ -108,7 +109,7 @@ static void test_inverse_roundtrip() {
     auto p_transformed = transform_point(T, p);
     auto p_back = transform_point(inverse_transform(T), p_transformed);
 
-    assert(vec3_near(p_back, p));
+    ASSERT_CHECK(vec3_near(p_back, p), "inverse roundtrip should recover original point within TOL");
     std::printf("  [PASS] Inverse roundtrip\n");
 }
 
@@ -123,8 +124,9 @@ static void test_extract() {
     auto R_out = extract_rotation(T);
     auto t_out = extract_translation(T);
 
-    assert((R - R_out).norm() < TOL);
-    assert(vec3_near(t, t_out));
+    // ||R||_F = sqrt(3) ≈ 1.73 > 1, so ASSERT_MATRIX_REL_NEAR would widen the bound; keep absolute check
+    ASSERT_CHECK((R - R_out).norm() < TOL, "extracted rotation should match original within TOL");
+    ASSERT_CHECK(vec3_near(t, t_out), "extracted translation should match original within TOL");
     std::printf("  [PASS] Extract rotation and translation\n");
 }
 
@@ -147,8 +149,9 @@ static void test_ball_balancer_chain() {
                                                   Eigen::Vector3d::Zero());
 
     // Ball should be approximately at (ball_x, ball_y, h_pivot + ball_r) for small angles
-    assert(std::abs(ball_world(2) - (h_pivot + ball_r)) < 0.01);
-    assert(std::abs(ball_world(0) - ball_x) < 0.01);
+    // 0.01: small-angle approximation error O(alpha^2 * h_pivot) ≈ 0.003; values are O(0.3) < 1, floor=1 applies
+    ASSERT_REL_NEAR(ball_world(2), h_pivot + ball_r, 0.01);
+    ASSERT_REL_NEAR(ball_world(0), ball_x, 0.01);
     std::printf("  [PASS] Ball-balancer frame chain (ball at %.3f, %.3f, %.3f)\n",
                 ball_world(0), ball_world(1), ball_world(2));
 }
