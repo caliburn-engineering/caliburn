@@ -149,7 +149,8 @@ static void test_ball_balancer_chain() {
                                                   Eigen::Vector3d::Zero());
 
     // Ball should be approximately at (ball_x, ball_y, h_pivot + ball_r) for small angles
-    // 0.01: small-angle approximation error O(alpha^2 * h_pivot) ≈ 0.003; values are O(0.3) < 1, floor=1 applies
+    // 0.01: small-angle approximation error O(alpha^2 * h_pivot); measured 4.6e-3 (z) and 9.4e-4 (x)
+    // in Release. Values are O(0.3) < 1, so the floor-1 scale keeps this the original absolute check.
     ASSERT_REL_NEAR(ball_world(2), h_pivot + ball_r, 0.01);
     ASSERT_REL_NEAR(ball_world(0), ball_x, 0.01);
     std::printf("  [PASS] Ball-balancer frame chain (ball at %.3f, %.3f, %.3f)\n",

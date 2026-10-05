@@ -68,9 +68,10 @@ void test_constant_velocity_tracking() {
     double avg_pos_error = pos_error_sum / 20.0;
     double avg_vel_estimate = vel_estimate_sum / 20.0;
 
-    // 0.5 m: after 100 steps with measurement noise sigma=1, Kalman tracks within ~0.3 m; 0.5 gives ~1.7× margin
+    // 0.5 m: after 100 steps with measurement noise sigma=1; measured 0.168 m (Release), ~3x margin
     ASSERT_CHECK(avg_pos_error < 0.5, "position estimate error should be < 0.5 after convergence");
-    // 1.0 m/s: true_velocity=5 but magnitudes are O(5) > 1; ASSERT_REL_NEAR would be 5× looser; velocity error ~0.2–0.4 after convergence
+    // 1.0 m/s: magnitudes are O(5) > 1, so ASSERT_REL_NEAR would be 5x looser; measured
+    // velocity error 0.038 m/s (Release), ~25x margin
     ASSERT_CHECK(std::abs(avg_vel_estimate - true_velocity) < 1.0,
                  "velocity estimate should converge within 1.0 of true_velocity=5.0");
 
@@ -186,7 +187,8 @@ void test_innovation_consistency() {
     double avg_innovation = innovation_abs_sum / static_cast<double>(tail_count);
     double three_sigma = 3.0 * std::sqrt(R(0, 0));
 
-    // three_sigma = 3*sqrt(R) = 3; by consistency theory mean|innovation| ~ sqrt(2/π)·sigma ≈ 0.8 << 3
+    // three_sigma = 3*sqrt(R) = 3; a consistent filter gives mean|innovation| of order sigma;
+    // measured 0.955 (Release)
     ASSERT_CHECK(avg_innovation < three_sigma,
                  "average innovation magnitude should be within 3-sigma of sqrt(R)");
 

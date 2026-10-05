@@ -22,7 +22,7 @@ void test_exponential_decay() {
     Eigen::VectorXd y = caliburn::rk4_integrate(y0, 0.0, h, steps, f);
     const double error = std::abs(y(0) - std::exp(-1.0));
 
-    // 1e-8: RK4 global error O(h^4·T) with h=0.01, T=1; leading error constant ~1/30 → ~3e-9
+    // 1e-8: RK4 global error O(h^4·T) with h=0.01, T=1; measured 3.1e-11 (Release), ~300x margin
     ASSERT_CHECK(error < 1e-8, "exponential decay: RK4 global error should be < 1e-8 at t=1 with h=0.01");
     std::cout << "  exponential decay   error = " << error << "  PASS\n";
 }
