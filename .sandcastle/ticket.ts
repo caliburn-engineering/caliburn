@@ -47,6 +47,7 @@ const TICKETS: Record<number, { repo: "caliburn" | "bb"; slug: string }> = {
   79: { repo: "caliburn", slug: "asserts-simulation" },
   80: { repo: "caliburn", slug: "asserts-vehicle-dynamics" },
   81: { repo: "caliburn", slug: "asserts-rest" },
+  83: { repo: "caliburn", slug: "pid-ki-sign" },
 };
 
 const n = Number(process.argv[2]);
