@@ -6,9 +6,8 @@
 
 using namespace caliburn;
 
-// Exact: steady_state_yaw_rate calls wheelbase() + understeer_gradient() and evaluates
-// V*delta/(L+K_us*V²) — identical operands and order as r_expected below; IEEE 754 gives
-// a bitwise-identical result. Tolerance = 0.
+// 0: its one use (steady-state yaw rate) evaluates V·delta/(L + K_us·V·V) with the same
+// operands in the same order as the implementation, so both sides round identically.
 static constexpr double kTol = 0.0;
 
 static VehicleParams default_car() {
@@ -78,9 +77,12 @@ void test_simulation_converges_to_steady_state() {
     double r_ss = model.steady_state_yaw_rate(delta, V);
 
     double error = std::abs(r_sim - r_ss);
-    // FP accumulation over 5000 RK4 steps: N·eps·|r_ss| ≈ 5000·2.2e-16·0.13 ≈ 1.7e-13;
-    // safety factor 10 → 2e-12. Measured Release: 2.6e-13.
-    ASSERT_CHECK(error < 2e-12, "RK4 simulation converges to steady-state yaw rate within 2e-12 rad/s after 5 s");
+    // The error is the decaying transient, not round-off. At V = 20 the lateral/yaw modes
+    // are -5.387 ± 2.495j and A is diagonalisable with κ(V) = 7.80, so from x0 = 0:
+    // |r - r_ss| ≤ ‖x - x_ss‖ ≤ κ(V)·‖x_ss‖·e^{-5.387·5} = 7.80·0.2885·e^{-26.93} ≈ 4.5e-12.
+    // RK4 at h·|λ| ≈ 0.006 tracks e^{hλ} to O((hλ)^5) per step; round-off is ~1e-16 per step,
+    // contracted. 1e-11 is ~2× over the bound.
+    ASSERT_CHECK(error < 1e-11, "RK4 simulation converges to steady-state yaw rate within 1e-11 rad/s after 5 s");
     printf("  simulation converges to r_ss: error = %.6f — PASS\n", error);
 }
 
