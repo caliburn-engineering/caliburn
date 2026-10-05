@@ -6,6 +6,9 @@
 
 using namespace caliburn;
 
+// TODO(#75): tolerance unjustified — every use measures exactly 0 in Release (linear
+// proportionality, zero-slip forces, saturated magnitude and direction ratio), so 1e-3 N
+// is far looser than the arithmetic needs. Kept per #75: no tolerance values change.
 static constexpr double kTol = 1e-3;
 
 static PacejkaParams default_lateral_params() {
@@ -72,8 +75,10 @@ void test_pacejka_peak_bounded_by_D() {
 
     // Peak force should not exceed D (the peak parameter)
     double peak_force = tyre.peak_force();
+    // TODO(#75): tolerance unjustified — sin() <= 1 bounds the peak by D exactly, and the
+    // measured peak/D is 1.0 (Release); the 1% margin is not needed for rounding.
     ASSERT_CHECK(peak_force <= default_lateral_params().D * 1.01,
-                 "Pacejka peak force is bounded by D (the peak scale factor), with 1% float margin");
+                 "Pacejka peak force is bounded by D (the peak scale factor)");
 
     printf("  peak force (%.1f) <= D (%.1f) — PASS\n",
            peak_force, default_lateral_params().D);
@@ -162,7 +167,8 @@ void test_force_slip_curve_initial_slope() {
 
     // Should be within 5% (approximation valid only at very small slip)
     double error = std::abs(slope - expected_slope) / expected_slope;
-    // 5%: B*C*D is the exact initial slope; at slip=0.001 the small-angle approximation holds to <1%
+    // TODO(#75): tolerance unjustified — measured relative slope error at slip=0.001 is 5.4e-5
+    // (Release), so 5% is ~1000x looser than the small-slip approximation error.
     ASSERT_CHECK(error < 0.05, "initial slope is within 5% of B*C*D (small-angle approximation at slip=0.001)");
 
     printf("  initial slope: %.0f vs expected %.0f (error %.1f%%) — PASS\n",

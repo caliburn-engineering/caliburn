@@ -6,6 +6,8 @@
 
 using namespace caliburn;
 
+// TODO(#75): tolerance unjustified — its one use (steady-state yaw rate) evaluates the same
+// closed form on both sides and measures a difference of exactly 0 in Release.
 static constexpr double kTol = 1e-4;
 
 static VehicleParams default_car() {
@@ -51,7 +53,7 @@ void test_steady_state_yaw_rate() {
     double K_us = car.understeer_gradient();
     double r_expected = V * delta / (L + K_us * V * V);
 
-    // 1e-4: both sides evaluate the same formula; yaw rate ~0.15 rad/s < 1 so floor-1 scale makes this absolute
+    // Yaw rate ~0.15 rad/s < 1, so the floor-1 scale makes this the original absolute check.
     ASSERT_REL_NEAR(r_ss, r_expected, kTol);
     printf("  steady-state yaw rate at V=20: %.4f rad/s — PASS\n", r_ss);
 }
@@ -75,7 +77,8 @@ void test_simulation_converges_to_steady_state() {
     double r_ss = model.steady_state_yaw_rate(delta, V);
 
     double error = std::abs(r_sim - r_ss);
-    // 1e-3: RK4 with dt=0.001 gives O(dt^4) per step; 5000-step cumulative error is negligible; 0.001 is a generous convergence bound
+    // TODO(#75): tolerance unjustified — measured error is 2.6e-13 (Release), so 1e-3 is
+    // ~1e9x looser than the RK4 settling error actually reached.
     ASSERT_CHECK(error < 0.001, "RK4 simulation converges to steady-state yaw rate within 0.001 rad/s after 5 s");
     printf("  simulation converges to r_ss: error = %.6f — PASS\n", error);
 }
