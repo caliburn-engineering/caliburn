@@ -29,7 +29,7 @@ void test_exponential_decay() {
 // ---------------------------------------------------------------------------
 // Test 2: Harmonic oscillator  x'' = -x  as first-order system
 //         State: [x, v],  derivatives: [v, -x]
-//         IC: x(0) = 1, v(0) = 0   =>   x(2*pi) = 1, v(2*pi) = 0
+//         IC: x(0) = 1, v(0) = 0   =>   x(t) = cos(t), v(t) = -sin(t)
 // ---------------------------------------------------------------------------
 void test_harmonic_oscillator() {
     caliburn::DerivativeFn f = [](double /*t*/, const Eigen::VectorXd& y) {
@@ -47,8 +47,12 @@ void test_harmonic_oscillator() {
     const int steps = static_cast<int>(std::round(period / h));
 
     Eigen::VectorXd y = caliburn::rk4_integrate(y0, 0.0, h, steps, f);
-    const double x_error = std::abs(y(0) - 1.0);
-    const double v_error = std::abs(y(1) - 0.0);
+    // Compare at the time actually reached: steps * h = 6.283 stops 1.85e-4 short
+    // of 2*pi, so v(t_end) = -sin(t_end) ~ 1.85e-4, not 0. RK4 global error is
+    // O(h^4 * t_end) ~ 1e-11 here, far inside the 1e-6 tolerance.
+    const double t_end = steps * h;
+    const double x_error = std::abs(y(0) - std::cos(t_end));
+    const double v_error = std::abs(y(1) + std::sin(t_end));
 
     assert(x_error < 1e-6);
     assert(v_error < 1e-6);
