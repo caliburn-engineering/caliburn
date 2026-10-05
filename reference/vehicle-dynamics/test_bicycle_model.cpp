@@ -1,11 +1,13 @@
 #include "bicycle_model.h"
 
-#include <cassert>
+#include "../test/assert_rel.h"
 #include <cmath>
 #include <cstdio>
 
 using namespace caliburn;
 
+// TODO(#75): tolerance unjustified — its one use (steady-state yaw rate) evaluates the same
+// closed form on both sides and measures a difference of exactly 0 in Release.
 static constexpr double kTol = 1e-4;
 
 static VehicleParams default_car() {
@@ -35,7 +37,7 @@ void test_understeer_gradient() {
     auto car = default_car();
     double K_us = car.understeer_gradient();
     // Lf < Lr and Cf == Cr → Lr/Cf > Lf/Cr → K_us > 0 (understeer)
-    assert(K_us > 0.0);
+    ASSERT_CHECK(K_us > 0.0, "Lf=1.2 < Lr=1.4 with equal stiffness gives Lr/Cf > Lf/Cr, so K_us > 0 (understeer)");
     printf("  understeer gradient: %.6f rad/(m/s^2) — PASS\n", K_us);
 }
 
@@ -51,7 +53,8 @@ void test_steady_state_yaw_rate() {
     double K_us = car.understeer_gradient();
     double r_expected = V * delta / (L + K_us * V * V);
 
-    assert(std::abs(r_ss - r_expected) < kTol);
+    // Yaw rate ~0.15 rad/s < 1, so the floor-1 scale makes this the original absolute check.
+    ASSERT_REL_NEAR(r_ss, r_expected, kTol);
     printf("  steady-state yaw rate at V=20: %.4f rad/s — PASS\n", r_ss);
 }
 
@@ -74,7 +77,9 @@ void test_simulation_converges_to_steady_state() {
     double r_ss = model.steady_state_yaw_rate(delta, V);
 
     double error = std::abs(r_sim - r_ss);
-    assert(error < 0.001);
+    // TODO(#75): tolerance unjustified — measured error is 2.6e-13 (Release), so 1e-3 is
+    // ~1e9x looser than the RK4 settling error actually reached.
+    ASSERT_CHECK(error < 0.001, "RK4 simulation converges to steady-state yaw rate within 0.001 rad/s after 5 s");
     printf("  simulation converges to r_ss: error = %.6f — PASS\n", error);
 }
 
@@ -83,10 +88,11 @@ void test_stability_understeer() {
     BicycleModel model(car);
 
     // Understeer vehicle should be stable at all speeds
-    assert(model.is_stable(10.0));
-    assert(model.is_stable(30.0));
-    assert(model.is_stable(50.0));
-    assert(model.critical_speed() == std::numeric_limits<double>::infinity());
+    ASSERT_CHECK(model.is_stable(10.0), "understeer car is stable at 10 m/s (all eigenvalues have negative real parts)");
+    ASSERT_CHECK(model.is_stable(30.0), "understeer car is stable at 30 m/s");
+    ASSERT_CHECK(model.is_stable(50.0), "understeer car is stable at 50 m/s");
+    ASSERT_CHECK(model.critical_speed() == std::numeric_limits<double>::infinity(),
+                 "understeer car (K_us > 0) returns infinity for critical speed");
     printf("  understeer vehicle stable at all speeds — PASS\n");
 }
 
@@ -95,13 +101,13 @@ void test_stability_oversteer() {
     BicycleModel model(car);
 
     double V_crit = model.critical_speed();
-    assert(std::isfinite(V_crit));
-    assert(V_crit > 0.0);
+    ASSERT_CHECK(std::isfinite(V_crit), "oversteer car has a finite critical speed");
+    ASSERT_CHECK(V_crit > 0.0, "critical speed is positive");
 
     // Should be stable below critical speed
-    assert(model.is_stable(V_crit * 0.8));
+    ASSERT_CHECK(model.is_stable(V_crit * 0.8), "oversteer car is stable below V_crit (at 0.8 * V_crit)");
     // Should be unstable above critical speed
-    assert(!model.is_stable(V_crit * 1.2));
+    ASSERT_CHECK(!model.is_stable(V_crit * 1.2), "oversteer car is unstable above V_crit (at 1.2 * V_crit)");
 
     printf("  oversteer vehicle: V_crit = %.1f m/s — PASS\n", V_crit);
 }
@@ -111,8 +117,8 @@ void test_eigenvalues_negative_real_parts() {
     BicycleModel model(car);
 
     auto eigs = model.eigenvalues(20.0);
-    assert(eigs(0).real() < 0.0);
-    assert(eigs(1).real() < 0.0);
+    ASSERT_CHECK(eigs(0).real() < 0.0, "first eigenvalue has negative real part for stable understeer car at 20 m/s");
+    ASSERT_CHECK(eigs(1).real() < 0.0, "second eigenvalue has negative real part for stable understeer car at 20 m/s");
     printf("  eigenvalues at V=20: (%.2f + %.2fj), (%.2f + %.2fj) — PASS\n",
            eigs(0).real(), eigs(0).imag(), eigs(1).real(), eigs(1).imag());
 }
