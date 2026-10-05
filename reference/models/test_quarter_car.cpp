@@ -79,15 +79,17 @@ void test_bump_response() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B_w * bump_height;
 
     double err = (x_final - x_ss).norm();
-    // TODO(#75): tolerance unjustified — measured err = 2.6e-10 (Release), so 0.01 is ~1e7x
-    // looser than the observed settling error.
-    ASSERT_CHECK(err < 0.01, "bump response did not settle to steady state");
+    // Transient decay at slowest pole: sigma_min = 2.116 rad/s (body-bounce mode,
+    // from eigenvalues of default-param A). Modal decomp: err <= cond(V)*|x_ss|*e^{-sigma*T}.
+    // cond(V) <= 60 (measured 5.8, from 2.63e-10 = cond(V)*0.071*e^{-21.2}); bound =
+    // 60*0.071*e^{-21.16} = 2.7e-9; measured 2.6e-10. Use 1e-8 (4x margin).
+    ASSERT_CHECK(err < 1e-8, "bump response did not settle to steady state");
 
     // Steady-state body position should equal bump height (body rises to road level)
     // x_ss(0) = z_b should be approximately bump_height
-    // TODO(#75): tolerance unjustified — x_ss comes from a static 4x4 solve; measured
-    // error is 6.9e-18 (Release), so 0.001 is ~1e14x looser than achieved.
-    ASSERT_CHECK(std::abs(x_ss(0) - bump_height) < 0.001,
+    // Static 4x4 solve; exact answer is bump_height. Error: cond(A)*eps*|result| where
+    // cond(A) ~ 10 and eps = 2.2e-16: bound = 10*2.2e-16*0.05 ~ 1e-16. Use 1e-14.
+    ASSERT_CHECK(std::abs(x_ss(0) - bump_height) < 1e-14,
                  "steady-state body position does not match bump height");
 
     std::cout << "  [PASS] Test 3: Bump response settles correctly (err=" << err
@@ -122,11 +124,41 @@ void test_input_matrices() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 5: A matrix structure — checks A(1,3) = c_s/m_b to catch the mutation
+// that zeros this entry (suspension damper coupling dropped from body equation)
+// ---------------------------------------------------------------------------
+void test_a_matrix_structure() {
+    caliburn::QuarterCarParams p;
+    auto model = caliburn::build_quarter_car(p);
+
+    // 1e-12: A entries are simple ratios of exactly-representable integer parameters;
+    // IEEE arithmetic gives exact or near-exact results.
+    double tol = 1e-12;
+
+    // Row 0: trivial kinematic row [0, 1, 0, 0]
+    ASSERT_CHECK(model.A(0, 0) == 0.0, "A(0,0) must be 0");
+    ASSERT_CHECK(model.A(0, 1) == 1.0, "A(0,1) must be 1 (kinematic)");
+    ASSERT_CHECK(model.A(0, 2) == 0.0, "A(0,2) must be 0");
+    ASSERT_CHECK(model.A(0, 3) == 0.0, "A(0,3) must be 0");
+
+    // Row 1: z_ddot_b from suspension spring and damper
+    // A(1,0) = -k_s/m_b = -66.67, A(1,2) = k_s/m_b = 66.67 — magnitudes > 1.
+    ASSERT_CHECK(std::abs(model.A(1, 0) - (-p.k_s / p.m_b)) < tol, "A(1,0) = -k_s/m_b");
+    // A(1,1) = -c_s/m_b = -5.0, A(1,3) = c_s/m_b = 5.0 — magnitudes > 1.
+    ASSERT_CHECK(std::abs(model.A(1, 1) - (-p.c_s / p.m_b)) < tol, "A(1,1) = -c_s/m_b");
+    ASSERT_CHECK(std::abs(model.A(1, 2) - (p.k_s / p.m_b)) < tol, "A(1,2) = k_s/m_b");
+    ASSERT_CHECK(std::abs(model.A(1, 3) - (p.c_s / p.m_b)) < tol, "A(1,3) = c_s/m_b");
+
+    std::cout << "  [PASS] Test 5: A matrix structure verified (including A(1,3) = c_s/m_b)\n";
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     test_natural_frequencies();
     test_eigenvalues_stable();
     test_bump_response();
     test_input_matrices();
+    test_a_matrix_structure();
 
     std::cout << "\nAll quarter-car tests passed.\n";
     return 0;

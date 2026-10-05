@@ -140,9 +140,11 @@ void test_step_response_rk4() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B * F;
 
     double err = (x_final - x_ss).norm();
-    // TODO(#75): tolerance unjustified — measured err = 1.1e-8 (Release), so 0.01 is ~1e6x
-    // looser than the observed settling error.
-    ASSERT_CHECK(err < 0.01, "step response did not converge to steady state");
+    // Transient decay at slowest pole: sigma_min = 0.382 rad/s (softer mode, from eigenvalues
+    // of underdamped double-MSD at these params). Modal decomp: err <= cond(V)*|x_ss|*e^{-sigma*T}
+    // where cond(V) ~ 2 (measured), |x_ss| = 1.118, T = 50 s: bound = 2*1.118*e^{-19.1} = 1.1e-8;
+    // measured 1.1e-8. Use 1e-7 (10x margin).
+    ASSERT_CHECK(err < 1e-7, "step response did not converge to steady state");
 
     std::cout << "  [PASS] Test 4: Step response converges to analytical steady-state (err="
               << err << ")\n";

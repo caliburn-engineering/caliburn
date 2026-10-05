@@ -82,12 +82,14 @@ static void test_ball_balancer_linearization() {
     auto result = validate(analytical, f, x0, u0, 1e-6);
 
     ASSERT_CHECK(result.pass, "ball-balancer validation must pass");
-    // TODO(#75): tolerance unjustified — A is linear in the state, so central differences are
-    // exact up to round-off; measured max_A_error = 0 (Release).
-    ASSERT_CHECK(result.max_A_error < 1e-8, "max A error must be < 1e-8");
-    // TODO(#75): tolerance unjustified — sin linearization at u0=0 via central diff;
-    // measured max_B_error = 1.2e-12 (Release), so 1e-6 is ~1e6x looser than achieved.
-    ASSERT_CHECK(result.max_B_error < 1e-6, "max B error must be < 1e-6 (sin linearization via central diff)");
+    // A is affine in state (dx(0)=x(2), dx(1)=x(3)); central diff of a linear function is
+    // exact in IEEE arithmetic (symmetric ±h perturbations cancel the constant exactly).
+    // max_A_error = 0.0 exactly; use 1e-14 to catch any future numerical regression.
+    ASSERT_CHECK(result.max_A_error < 1e-14, "max A error must be < 1e-14 (linear f: central diff exact)");
+    // B: sin linearisation at u0=0 via central diff with epsilon=1e-6. Truncation dominates:
+    // K*G * (1 - sin(h)/h) = K*G*h^2/6 = 0.714*9.81*(1e-6)^2/6 = 1.17e-12; measured 1.17e-12.
+    // Use 1e-11 (10x margin).
+    ASSERT_CHECK(result.max_B_error < 1e-11, "max B error must be < 1e-11 (sin via central diff, K*G*h^2/6)");
 
     std::printf("  [PASS] Ball-balancer analytical vs numerical (max_A=%.2e, max_B=%.2e)\n",
                 result.max_A_error, result.max_B_error);
@@ -139,9 +141,11 @@ static void test_nonzero_operating_point() {
     auto sys = linearize(f, x0, u0);
 
     // A(0,0) = -4.0 — magnitude > 1, so ASSERT_REL_NEAR would be looser.
-    // TODO(#75): tolerance unjustified — central diff of -x² is exact up to round-off
-    // (~eps/h); measured error 1.2e-10 (Release), so 1e-6 is ~1e4x looser.
-    ASSERT_CHECK(std::abs(sys.A(0, 0) - (-4.0)) < 1e-6, "A(0,0) = df/dx = -2*x0 = -4");
+    // Central diff of -x² at x0=2 is exact for the quadratic term; error is pure round-off
+    // from catastrophic cancellation in (f(x0+h)-f(x0-h))/2h: numerator ≈ -8h with each
+    // operand ≈ ±4h; round-off ≤ 2*eps*x0² / (2h) = eps*x0²/h = 2.2e-16*4/1e-6 = 8.8e-10.
+    // Use 1e-8 (10x margin); measured 1.15e-10.
+    ASSERT_CHECK(std::abs(sys.A(0, 0) - (-4.0)) < 1e-8, "A(0,0) = df/dx = -2*x0 = -4");
     ASSERT_REL_NEAR(sys.B(0, 0), 1.0, TOL);  // expected 1; scale = 1
 
     std::printf("  [PASS] Nonzero operating point (A=%.4f, B=%.4f)\n",
