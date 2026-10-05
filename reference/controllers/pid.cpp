@@ -1,11 +1,16 @@
 #include "pid.h"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace caliburn {
 
 PidController::PidController(const PidGains& gains, double output_min, double output_max)
-    : gains_(gains), output_min_(output_min), output_max_(output_max) {}
+    : gains_(gains), output_min_(output_min), output_max_(output_max) {
+    if (output_min > output_max) {
+        throw std::invalid_argument("PidController: output_min must not exceed output_max");
+    }
+}
 
 double PidController::compute(double setpoint, double measurement, double dt) {
     if (dt <= 0.0) {
@@ -21,9 +26,8 @@ double PidController::compute(double setpoint, double measurement, double dt) {
     integral_ += error * dt;
 
     if (gains_.Ki != 0.0) {
-        double integral_min = output_min_ / gains_.Ki;
-        double integral_max = output_max_ / gains_.Ki;
-        integral_ = std::clamp(integral_, integral_min, integral_max);
+        auto [lo, hi] = std::minmax({output_min_ / gains_.Ki, output_max_ / gains_.Ki});
+        integral_ = std::clamp(integral_, lo, hi);
     }
 
     double i_term = gains_.Ki * integral_;

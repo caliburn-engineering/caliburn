@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <stdexcept>
 
 using caliburn::PidController;
 using caliburn::PidGains;
@@ -278,6 +279,59 @@ static void check_dt_zero_guard() {
 }
 
 // ---------------------------------------------------------------------------
+// Check 5: Anti-windup for negative Ki
+//   Ki = -2, Kp = Kd = 0, limits [-1, 1], dt = 0.25.
+//   Ordered anti-windup bounds:
+//     lo = min(u_min/Ki, u_max/Ki) = min(-1/-2, 1/-2) = min(0.5, -0.5) = -0.5
+//     hi = max(u_min/Ki, u_max/Ki) = max(0.5, -0.5)                   =  0.5
+//   Drive with e = 100 (setpoint=100, measurement=0): after step 1,
+//     integral = 100*0.25 = 25 → clamped to hi = 0.5 (exact: dyadic).
+//   Ki * integral = -2 * 0.5 = -1.0 = output_min.
+//   Bug (today's main): std::clamp(25, 0.5, -0.5) is UB — with
+//     -D_GLIBCXX_ASSERTIONS the process aborts at "Assertion '!(__hi < __lo)' failed";
+//     without it, integral is pinned at -0.5 (wrong), so Ki*integral = 1 > output_max.
+// ---------------------------------------------------------------------------
+static void check_negative_ki_anti_windup() {
+    const double Ki = -2.0, u_min = -1.0, u_max = 1.0, dt = 0.25;
+    PidGains gains{0.0, Ki, 0.0};
+    PidController pid(gains, u_min, u_max);
+
+    for (int i = 0; i < 10; ++i) {
+        double out = pid.compute(100.0, 0.0, dt);
+        double ki_int = Ki * pid.integral();
+        ASSERT_CHECK(ki_int >= u_min, "Ki*integral must stay >= output_min for Ki < 0");
+        ASSERT_CHECK(ki_int <= u_max, "Ki*integral must stay <= output_max for Ki < 0");
+        ASSERT_CHECK(out >= u_min, "output must stay >= output_min");
+        ASSERT_CHECK(out <= u_max, "output must stay <= output_max");
+    }
+
+    // Clamped integral equals hi = max(u_min/Ki, u_max/Ki) = 0.5 exactly (dyadic).
+    ASSERT_REL_NEAR(pid.integral(), 0.5, 0.0);
+
+    std::printf("  [PASS] Check 5: negative-Ki anti-windup\n");
+}
+
+// ---------------------------------------------------------------------------
+// Check 6: Constructor rejects inverted output limits
+//   output_min > output_max  → std::invalid_argument (not assert — vanishes in Release).
+//   output_min == output_max → no throw (degenerate but valid).
+// ---------------------------------------------------------------------------
+static void check_invalid_output_limits() {
+    bool threw = false;
+    try {
+        PidController bad(PidGains{1.0, 0.0, 0.0}, 1.0, -1.0);
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    ASSERT_CHECK(threw, "output_min > output_max must throw std::invalid_argument");
+
+    PidController equal(PidGains{1.0, 0.0, 0.0}, 0.0, 0.0);
+    (void)equal;
+
+    std::printf("  [PASS] Check 6: invalid output limits rejected\n");
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("PID controller tests:\n");
 
@@ -291,6 +345,8 @@ int main() {
     check_anti_windup();
     check_derivative_filter();
     check_dt_zero_guard();
+    check_negative_ki_anti_windup();
+    check_invalid_output_limits();
 
     std::printf("All PID tests passed.\n");
     return 0;
