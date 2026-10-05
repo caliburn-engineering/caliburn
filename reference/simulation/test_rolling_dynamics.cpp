@@ -105,8 +105,10 @@ static void test_rolling_friction_y() {
     // Mutation grav_y + fric_y gives ay > 0, failing the first check.
     ASSERT_CHECK(d(3) < 0.0, "rolling y-friction must decelerate the ball");
     double expected = -(5.0 / 7.0) * 0.005 * G;
-    // 1e-10: same expression evaluated in test and implementation; expected bit-exact
-    ASSERT_REL_NEAR(d(3), expected, 1e-10);
+    // 1e-15: test and implementation evaluate the same product in a different order, so
+    // each side carries a few roundings (≤ ~4u relative); |ay| ≈ 0.035, so the difference
+    // is ≤ 2·4u·0.035 ≈ 3e-17, and ASSERT_REL_NEAR's floor of 1 makes 1e-15 absolute.
+    ASSERT_REL_NEAR(d(3), expected, 1e-15);
     std::printf("  [PASS] Rolling y-friction decelerates (ay=%.6f)\n", d(3));
 }
 
