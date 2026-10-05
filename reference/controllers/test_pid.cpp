@@ -1,7 +1,6 @@
 #include "pid.h"
 #include "assert_rel.h"
 
-#include <cassert>
 #include <cmath>
 #include <cstdio>
 
@@ -28,7 +27,9 @@ static void test_p_only_step_response() {
     }
 
     double error = std::fabs(setpoint - x);
-    assert(error < 0.01);
+    // TODO(#75): tolerance unjustified — error decays as (1 - Kp*dt)^n = 0.98^1000 ~ 1.7e-9,
+    // so 0.01 is ~1e7x looser than the derivable error.
+    ASSERT_CHECK(error < 0.01, "P-only convergence: error should be < 0.01 after 1000 steps");
     std::printf("  [PASS] P-only step response (error=%.6f)\n", error);
 }
 
@@ -52,7 +53,9 @@ static void test_pi_steady_state() {
     }
 
     double error = std::fabs(setpoint - x);
-    assert(error < 0.01);
+    // TODO(#75): tolerance unjustified — measured error prints as 0.000000 in Release;
+    // 0.01 is a loose convergence bound, not derived from the closed-loop decay rate.
+    ASSERT_CHECK(error < 0.01, "PI steady-state error should be < 0.01 after 5000 steps");
     std::printf("  [PASS] PI eliminates steady-state error (error=%.6f)\n", error);
 }
 
@@ -66,12 +69,12 @@ static void test_output_clamping() {
 
     // Large positive error
     double u = pid.compute(10.0, 0.0, 0.01);
-    assert(u == 1.0);
+    ASSERT_REL_NEAR(u, 1.0, 0.0);   // exact: clamp assigns u_max directly
 
     // Large negative error
     pid.reset();
     u = pid.compute(-10.0, 0.0, 0.01);
-    assert(u == -1.0);
+    ASSERT_REL_NEAR(u, -1.0, 0.0);  // exact: clamp assigns u_min directly
 
     std::printf("  [PASS] Output clamping\n");
 }
@@ -97,13 +100,15 @@ static void test_anti_windup() {
     }
 
     // Integral should be clamped, not at the unclamped value of ~10000
-    assert(pid.integral() < 1.0);
+    // 1.0: the clamp bound is u_max/Ki = 0.1; unclamped the integral would reach ~1000.
+    // Any threshold between the two separates clamped from unclamped.
+    ASSERT_CHECK(pid.integral() < 1.0, "anti-windup: integral must be clamped near u_max/Ki = 0.1, not wound up to ~1000");
 
     // Reverse: setpoint=0, measurement=2 => error = -2
     // P-term = -2.0, I-term = Ki * ~0.08 = ~0.8  =>  output < 0
     double u = pid.compute(0.0, 2.0, dt);
 
-    assert(u < 0.0);
+    ASSERT_CHECK(u < 0.0, "anti-windup: P-term dominates clamped I-term after reversal, output must be negative");
     std::printf("  [PASS] Anti-windup (output after reversal=%.4f)\n", u);
 }
 
@@ -116,10 +121,10 @@ static void test_reset() {
 
     pid.compute(1.0, 0.0, 0.01);
     pid.compute(1.0, 0.0, 0.01);
-    assert(pid.integral() != 0.0);
+    ASSERT_CHECK(pid.integral() != 0.0, "integral must accumulate after two valid compute() calls");
 
     pid.reset();
-    assert(pid.integral() == 0.0);
+    ASSERT_REL_NEAR(pid.integral(), 0.0, 0.0);  // exact: reset() assigns 0.0 directly
 
     std::printf("  [PASS] Reset zeroes integral\n");
 }
