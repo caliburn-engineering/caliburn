@@ -45,10 +45,9 @@ static void test_sim_time_accuracy() {
     // Pattern repeats. Total substeps should consume close to 1.6s minus residual accumulator.
     // sim_time + alpha*dt should reconstruct total elapsed time
     double reconstructed = ts.sim_time() + ts.alpha() * ts.dt();
-    // TODO(#75): tolerance unjustified — measured drift is 1.1e-15 (Release), so 1e-3 is
-    //       ~1e12x looser than achieved. reconstructed≈1.6 > 1, so ASSERT_REL_NEAR would
-    //       scale the threshold to 1.6×tol; kept as an absolute check.
-    ASSERT_CHECK(std::abs(reconstructed - 1.6) < 0.001, "reconstructed time matches 1.6s input");
+    // 160 substep pairs (sim_time += dt, acc -= dt) each contribute ≤ ε/2·1.6 to
+    // the reconstruction; total ≤ 160·ε·1.6/2 ≈ 2.8e-14; safety 4× → 1e-13 absolute.
+    ASSERT_CHECK(std::abs(reconstructed - 1.6) < 1e-13, "reconstructed time matches 1.6s input");
 
     std::printf("  [PASS] sim time accuracy over 100 frames\n");
 }
@@ -64,6 +63,21 @@ static void test_alpha_interpolation() {
     ASSERT_REL_NEAR(a, 0.5, 1e-9);
 
     std::printf("  [PASS] alpha interpolation\n");
+}
+
+static void test_accumulator_exact_boundary() {
+    // dt = 0.25 = 2^-2 and frame_dt = 0.25 = 2^-2 are exact in binary.
+    // After accumulate(0.25): acc = 0.25 = dt exactly, so `>= dt` fires one substep.
+    // The mutation `accumulator > dt` (strict) would fire zero substeps, failing this check.
+    caliburn::FixedTimestep ts(0.25);
+    int substeps = ts.accumulate(0.25, []() {});
+    ASSERT_CHECK(substeps == 1, "accumulator landing exactly on dt must fire one substep");
+    // exact: dyadic operands; fl(0 + 0.25) = 0.25, tolerance 0
+    ASSERT_REL_NEAR(ts.sim_time(), 0.25, 0.0);
+    // exact: dyadic subtraction 0.25 - 0.25 = 0; alpha = 0/0.25 = 0, tolerance 0
+    ASSERT_REL_NEAR(ts.alpha(), 0.0, 0.0);
+
+    std::printf("  [PASS] accumulator exact boundary\n");
 }
 
 static void test_zero_frame_dt() {
@@ -86,7 +100,8 @@ int main() {
     test_sim_time_accuracy();
     test_alpha_interpolation();
     test_zero_frame_dt();
+    test_accumulator_exact_boundary();
 
-    std::printf("All 5 tests passed.\n");
+    std::printf("All 6 tests passed.\n");
     return 0;
 }
