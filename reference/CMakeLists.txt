@@ -258,3 +258,31 @@ add_executable(test_assert_rel_nan_fires
 )
 add_test(NAME assert_rel_nan_fires COMMAND test_assert_rel_nan_fires)
 set_tests_properties(assert_rel_nan_fires PROPERTIES WILL_FAIL TRUE)
+
+# Bare assert must fire in every build type: NDEBUG is defined explicitly here, and the
+# source-file guard below applies -UNDEBUG to test_bare_assert_fires.cpp, which comes after
+# -DNDEBUG in the compile command and re-enables assert. WILL_FAIL: ctest passes only if
+# assert fires. When the guard is removed, NDEBUG silences the assert, the test returns 0,
+# and WILL_FAIL causes ctest to report it as a failure — turning the guard red.
+add_executable(test_bare_assert_fires
+    test/test_bare_assert_fires.cpp
+)
+target_compile_definitions(test_bare_assert_fires PRIVATE NDEBUG)
+add_test(NAME bare_assert_fires COMMAND test_bare_assert_fires)
+set_tests_properties(bare_assert_fires PROPERTIES WILL_FAIL TRUE)
+
+# --- -UNDEBUG guard: keep bare assert active in Release ---
+# CMake's Release preset adds -DNDEBUG, silencing every <cassert> assert in test sources.
+# Apply -UNDEBUG to each test_*.cpp so the flag order in the compile command is:
+#   ... -DNDEBUG ... -UNDEBUG ...   (test sources)
+#   ... -DNDEBUG ...                (implementation sources, unaffected)
+# Excludes:
+#   - build*/ directories (FetchContent artefacts)
+#   - test_assert_check_fires.cpp (tests ASSERT_CHECK under NDEBUG on purpose; -UNDEBUG
+#     would void that test)
+file(GLOB_RECURSE _test_sources CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/*/test_*.cpp"
+)
+list(FILTER _test_sources EXCLUDE REGEX ".*/build[^/]*/.*")
+list(FILTER _test_sources EXCLUDE REGEX ".*/test_assert_check_fires\\.cpp$")
+set_source_files_properties(${_test_sources} PROPERTIES COMPILE_OPTIONS "-UNDEBUG")
