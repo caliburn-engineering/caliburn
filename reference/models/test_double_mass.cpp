@@ -1,6 +1,6 @@
 #include "double_mass_spring_damper.h"
 #include "../integrators/rk4.h"
-#include <cassert>
+#include "../test/assert_rel.h"
 #include <cmath>
 #include <iostream>
 #include <complex>
@@ -17,35 +17,38 @@ void test_matrix_structure() {
     auto model = caliburn::build_double_msd(p);
 
     // Row 0: trivial kinematic row [0, 1, 0, 0]
-    assert(model.A(0, 0) == 0.0);
-    assert(model.A(0, 1) == 1.0);
-    assert(model.A(0, 2) == 0.0);
-    assert(model.A(0, 3) == 0.0);
+    ASSERT_CHECK(model.A(0, 0) == 0.0, "A(0,0) must be 0 (kinematic row)");
+    ASSERT_CHECK(model.A(0, 1) == 1.0, "A(0,1) must be 1 (kinematic row)");
+    ASSERT_CHECK(model.A(0, 2) == 0.0, "A(0,2) must be 0 (kinematic row)");
+    ASSERT_CHECK(model.A(0, 3) == 0.0, "A(0,3) must be 0 (kinematic row)");
 
     // Row 2: trivial kinematic row [0, 0, 0, 1]
-    assert(model.A(2, 0) == 0.0);
-    assert(model.A(2, 1) == 0.0);
-    assert(model.A(2, 2) == 0.0);
-    assert(model.A(2, 3) == 1.0);
+    ASSERT_CHECK(model.A(2, 0) == 0.0, "A(2,0) must be 0 (kinematic row)");
+    ASSERT_CHECK(model.A(2, 1) == 0.0, "A(2,1) must be 0 (kinematic row)");
+    ASSERT_CHECK(model.A(2, 2) == 0.0, "A(2,2) must be 0 (kinematic row)");
+    ASSERT_CHECK(model.A(2, 3) == 1.0, "A(2,3) must be 1 (kinematic row)");
 
     // Row 1: -(k1+k2)/m1
+    // 1e-12: A and B entries are simple ratios of exactly-representable integer inputs; IEEE arithmetic gives exact or near-exact results.
     double tol = 1e-12;
-    assert(std::abs(model.A(1, 0) - (-(p.k1 + p.k2) / p.m1)) < tol);
-    assert(std::abs(model.A(1, 1) - (-(p.c1 + p.c2) / p.m1)) < tol);
-    assert(std::abs(model.A(1, 2) - (p.k2 / p.m1)) < tol);
-    assert(std::abs(model.A(1, 3) - (p.c2 / p.m1)) < tol);
+    // Magnitudes of A(1,0..2) are 17.5, 1.5, 10 — all > 1, so ASSERT_REL_NEAR would be looser.
+    ASSERT_CHECK(std::abs(model.A(1, 0) - (-(p.k1 + p.k2) / p.m1)) < tol, "A(1,0) = -(k1+k2)/m1");
+    ASSERT_CHECK(std::abs(model.A(1, 1) - (-(p.c1 + p.c2) / p.m1)) < tol, "A(1,1) = -(c1+c2)/m1");
+    ASSERT_CHECK(std::abs(model.A(1, 2) - (p.k2 / p.m1)) < tol, "A(1,2) = k2/m1");
+    ASSERT_REL_NEAR(model.A(1, 3), p.c2 / p.m1, tol);  // expected 1.0; scale = max(1, 1, 1) = 1
 
     // Row 3: coupling with opposite signs (Newton's 3rd law)
-    assert(std::abs(model.A(3, 0) - (p.k2 / p.m2)) < tol);
-    assert(std::abs(model.A(3, 1) - (p.c2 / p.m2)) < tol);
-    assert(std::abs(model.A(3, 2) - (-p.k2 / p.m2)) < tol);
-    assert(std::abs(model.A(3, 3) - (-p.c2 / p.m2)) < tol);
+    // A(3,0) = 6.67 and A(3,2) = -6.67 — magnitudes > 1, so ASSERT_REL_NEAR would be looser.
+    ASSERT_CHECK(std::abs(model.A(3, 0) - (p.k2 / p.m2)) < tol, "A(3,0) = k2/m2");
+    ASSERT_REL_NEAR(model.A(3, 1), p.c2 / p.m2, tol);   // expected 0.67; scale = 1
+    ASSERT_CHECK(std::abs(model.A(3, 2) - (-p.k2 / p.m2)) < tol, "A(3,2) = -k2/m2");
+    ASSERT_REL_NEAR(model.A(3, 3), -p.c2 / p.m2, tol);  // expected -0.67; scale = 1
 
     // B: only 1/m2 at last entry
-    assert(model.B(0) == 0.0);
-    assert(model.B(1) == 0.0);
-    assert(model.B(2) == 0.0);
-    assert(std::abs(model.B(3) - 1.0 / p.m2) < tol);
+    ASSERT_CHECK(model.B(0) == 0.0, "B(0) must be 0");
+    ASSERT_CHECK(model.B(1) == 0.0, "B(1) must be 0");
+    ASSERT_CHECK(model.B(2) == 0.0, "B(2) must be 0");
+    ASSERT_REL_NEAR(model.B(3), 1.0 / p.m2, tol);  // expected 0.33; scale = 1
 
     std::cout << "  [PASS] Test 1: A matrix structure verification\n";
 }
@@ -60,7 +63,7 @@ void test_eigenvalues_stable() {
     Eigen::EigenSolver<Eigen::Matrix4d> es(model.A);
     for (int i = 0; i < 4; ++i) {
         double re = es.eigenvalues()(i).real();
-        assert(re < 0.0 && "eigenvalue has non-negative real part for damped system");
+        ASSERT_CHECK(re < 0.0, "eigenvalue has non-negative real part for damped system");
     }
 
     std::cout << "  [PASS] Test 2: All eigenvalues have negative real parts\n";
@@ -99,10 +102,11 @@ void test_natural_frequencies() {
     double omega_2 = std::sqrt(15.0 + std::sqrt(125.0));
     double tol = 1e-8;
 
-    assert(std::abs(freqs[0] - omega_1) < tol);
-    assert(std::abs(freqs[1] - omega_1) < tol);
-    assert(std::abs(freqs[2] - omega_2) < tol);
-    assert(std::abs(freqs[3] - omega_2) < tol);
+    // omega_1 ≈ 1.95 rad/s, omega_2 ≈ 5.12 rad/s — both > 1, so ASSERT_REL_NEAR would be looser.
+    ASSERT_CHECK(std::abs(freqs[0] - omega_1) < tol, "first natural frequency must match omega_1");
+    ASSERT_CHECK(std::abs(freqs[1] - omega_1) < tol, "conjugate pair of omega_1 must match");
+    ASSERT_CHECK(std::abs(freqs[2] - omega_2) < tol, "second natural frequency must match omega_2");
+    ASSERT_CHECK(std::abs(freqs[3] - omega_2) < tol, "conjugate pair of omega_2 must match");
 
     std::cout << "  [PASS] Test 3: Natural frequencies match analytical (omega_1="
               << omega_1 << ", omega_2=" << omega_2 << ")\n";
@@ -136,7 +140,7 @@ void test_step_response_rk4() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B * F;
 
     double err = (x_final - x_ss).norm();
-    assert(err < 0.01 && "step response did not converge to steady state");
+    ASSERT_CHECK(err < 0.01, "step response did not converge to steady state");
 
     std::cout << "  [PASS] Test 4: Step response converges to analytical steady-state (err="
               << err << ")\n";

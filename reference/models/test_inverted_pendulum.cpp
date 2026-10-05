@@ -1,7 +1,7 @@
 #include "inverted_pendulum.h"
 #include "../controllers/lqr.h"
 #include "../integrators/rk4.h"
-#include <cassert>
+#include "../test/assert_rel.h"
 #include <cmath>
 #include <iostream>
 #include <complex>
@@ -21,7 +21,7 @@ void test_open_loop_unstable() {
             has_unstable = true;
         }
     }
-    assert(has_unstable && "inverted pendulum should be open-loop unstable");
+    ASSERT_CHECK(has_unstable, "inverted pendulum should be open-loop unstable");
 
     std::cout << "  [PASS] Test 1: Open-loop unstable (has positive eigenvalue)\n";
     std::cout << "         Eigenvalues: ";
@@ -44,25 +44,26 @@ void test_matrix_structure() {
 
     auto model = caliburn::build_inverted_pendulum(p);
 
+    // 1e-10: A and B entries are 2-3 floating-point operations on O(10) values
+    // including g=9.81 (not exactly representable); error bounded by a few ULPs of
+    // result (< 1e-13 for these magnitudes), well within 1e-10.
     double tol = 1e-10;
 
     // Trivial rows
-    assert(model.A(0, 1) == 1.0);
-    assert(model.A(2, 3) == 1.0);
+    ASSERT_CHECK(model.A(0, 1) == 1.0, "A(0,1) must be 1 (kinematic row)");
+    ASSERT_CHECK(model.A(2, 3) == 1.0, "A(2,3) must be 1 (kinematic row)");
 
-    // A(1,2): -m*g/M
+    // A(1,2): -m*g/M = -0.5*9.81/2 = -2.4525 — magnitude > 1, so ASSERT_REL_NEAR would be looser.
     double expected_A12 = -p.m * p.g / p.M;
-    assert(std::abs(model.A(1, 2) - expected_A12) < tol);
+    ASSERT_CHECK(std::abs(model.A(1, 2) - expected_A12) < tol, "A(1,2) = -m*g/M");
 
-    // A(3,2): (M+m)*g/(M*L)
+    // A(3,2): (M+m)*g/(M*L) = 2.5*9.81/2 = 12.26 — magnitude >> 1, so ASSERT_REL_NEAR would be looser.
     double expected_A32 = (p.M + p.m) * p.g / (p.M * p.L);
-    assert(std::abs(model.A(3, 2) - expected_A32) < tol);
+    ASSERT_CHECK(std::abs(model.A(3, 2) - expected_A32) < tol, "A(3,2) = (M+m)*g/(M*L)");
 
-    // B(1): 1/M
-    assert(std::abs(model.B(1) - 1.0 / p.M) < tol);
-
-    // B(3): -1/(M*L)
-    assert(std::abs(model.B(3) - (-1.0 / (p.M * p.L))) < tol);
+    // B(1): 1/M = 0.5; B(3): -1/(M*L) = -0.5 — both < 1; scale = 1.
+    ASSERT_REL_NEAR(model.B(1), 1.0 / p.M, tol);
+    ASSERT_REL_NEAR(model.B(3), -1.0 / (p.M * p.L), tol);
 
     std::cout << "  [PASS] Test 2: A matrix structure verified\n";
 }
@@ -92,7 +93,7 @@ void test_lqr_stabilisation() {
 
     for (int i = 0; i < 4; ++i) {
         double re = es.eigenvalues()(i).real();
-        assert(re < 0.0 && "LQR closed-loop eigenvalue has non-negative real part");
+        ASSERT_CHECK(re < 0.0, "LQR closed-loop eigenvalue has non-negative real part");
     }
 
     std::cout << "  [PASS] Test 3: LQR stabilises inverted pendulum (all closed-loop poles stable)\n";
@@ -130,8 +131,8 @@ void test_lqr_simulation() {
 
     Eigen::VectorXd x_final = caliburn::rk4_integrate(x0, 0.0, dt, steps, deriv);
 
-    assert(x_final.norm() < 0.01 &&
-           "LQR did not stabilise the pendulum from small perturbation");
+    ASSERT_CHECK(x_final.norm() < 0.01,
+                 "LQR did not stabilise the pendulum from small perturbation");
 
     std::cout << "  [PASS] Test 4: LQR simulation recovers from theta=0.1 rad "
               << "(final state norm=" << x_final.norm() << ")\n";
