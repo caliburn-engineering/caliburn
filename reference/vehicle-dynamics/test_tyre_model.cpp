@@ -1,6 +1,6 @@
 #include "tyre_model.h"
 
-#include <cassert>
+#include "../test/assert_rel.h"
 #include <cmath>
 #include <cstdio>
 
@@ -32,10 +32,12 @@ void test_linear_tyre() {
     // Force proportional to slip angle
     double F1 = tyre.lateral_force(0.01);   // ~1 degree
     double F2 = tyre.lateral_force(0.02);   // ~2 degrees
-    assert(std::abs(F2 - 2.0 * F1) < kTol);
+    // 1e-3 abs: linear tyre is exactly proportional; F1≈800 N, F2≈1600 N — absolute is tighter than relative
+    ASSERT_CHECK(std::abs(F2 - 2.0 * F1) < kTol, "linear tyre force is exactly proportional to slip angle");
 
     // Zero slip = zero force
-    assert(std::abs(tyre.lateral_force(0.0)) < kTol);
+    // 1e-3: stiffness * 0 = 0 exactly; floor-1 scale makes this an absolute check on a near-zero value
+    ASSERT_REL_NEAR(tyre.lateral_force(0.0), 0.0, kTol);
 
     printf("  linear tyre: F(0.01) = %.1f N — PASS\n", F1);
 }
@@ -44,22 +46,23 @@ void test_pacejka_shape() {
     PacejkaTyre tyre(default_lateral_params());
 
     // Zero slip = zero force
-    assert(std::abs(tyre.force(0.0)) < kTol);
+    // 1e-3: sin(C*atan(0)) = sin(0) = 0 exactly; floor-1 scale makes this an absolute check
+    ASSERT_REL_NEAR(tyre.force(0.0), 0.0, kTol);
 
     // Force increases initially
     double F_small = tyre.force(0.02);
     double F_larger = tyre.force(0.05);
-    assert(F_larger > F_small);
+    ASSERT_CHECK(F_larger > F_small, "force increases from 0.02 to 0.05 rad on the initial slope");
 
     // Peak exists and is positive
     double peak = tyre.peak_slip();
     double peak_force = tyre.peak_force();
-    assert(peak > 0.0 && peak < 0.5);
-    assert(peak_force > 0.0);
+    ASSERT_CHECK(peak > 0.0 && peak < 0.5, "peak slip is in (0, 0.5) rad for B=10, C=1.5");
+    ASSERT_CHECK(peak_force > 0.0, "peak force is positive because D = 5000 N > 0");
 
     // Force at peak is greater than force at 2x peak (post-peak drop)
     double F_post = tyre.force(2.0 * peak);
-    assert(peak_force > F_post);
+    ASSERT_CHECK(peak_force > F_post, "force drops past the peak (post-peak regime of the Magic Formula)");
 
     printf("  pacejka shape: peak at slip=%.3f, F_peak=%.1f N — PASS\n", peak, peak_force);
 }
@@ -69,7 +72,8 @@ void test_pacejka_peak_bounded_by_D() {
 
     // Peak force should not exceed D (the peak parameter)
     double peak_force = tyre.peak_force();
-    assert(peak_force <= default_lateral_params().D * 1.01);  // small tolerance
+    ASSERT_CHECK(peak_force <= default_lateral_params().D * 1.01,
+                 "Pacejka peak force is bounded by D (the peak scale factor), with 1% float margin");
 
     printf("  peak force (%.1f) <= D (%.1f) — PASS\n",
            peak_force, default_lateral_params().D);
@@ -80,13 +84,13 @@ void test_traction_circle_within() {
     double Fz = 5000.0;
 
     // Inside the circle
-    assert(circle.is_within(1000.0, 1000.0, Fz));
+    ASSERT_CHECK(circle.is_within(1000.0, 1000.0, Fz), "sqrt(1000^2+1000^2)=1414 N is well inside the 4500 N circle");
     // On the boundary
     double F_max = 0.9 * 5000.0;  // 4500 N
-    assert(circle.is_within(F_max, 0.0, Fz));
-    assert(circle.is_within(0.0, F_max, Fz));
+    ASSERT_CHECK(circle.is_within(F_max, 0.0, Fz), "F_max on one axis lies on the circle boundary (F_max^2 <= F_max^2)");
+    ASSERT_CHECK(circle.is_within(0.0, F_max, Fz), "F_max on the other axis lies on the circle boundary");
     // Outside
-    assert(!circle.is_within(4000.0, 3000.0, Fz));  // sqrt(4000^2+3000^2)=5000 > 4500
+    ASSERT_CHECK(!circle.is_within(4000.0, 3000.0, Fz), "sqrt(4000^2+3000^2)=5000 N exceeds the 4500 N circle");
 
     printf("  traction circle bounds check — PASS\n");
 }
@@ -102,11 +106,13 @@ void test_traction_circle_saturate() {
     circle.saturate(Fx, Fy, Fz);
 
     double F_mag = std::sqrt(Fx * Fx + Fy * Fy);
-    assert(std::abs(F_mag - F_max) < kTol);
+    // 1e-3 abs: saturate must scale exactly to F_max=4500 N; absolute is tighter than relative at this magnitude
+    ASSERT_CHECK(std::abs(F_mag - F_max) < kTol, "saturated magnitude equals F_max exactly");
 
     // Direction preserved
     double ratio = Fx / Fy;
-    assert(std::abs(ratio - 4000.0 / 3000.0) < kTol);
+    // 1e-3 abs: ratio≈1.33 > 1, so relative-1 floor gives 1e-3*1.33; kept absolute for a stricter bound
+    ASSERT_CHECK(std::abs(ratio - 4000.0 / 3000.0) < kTol, "direction ratio Fx/Fy is preserved by saturation");
 
     printf("  traction circle saturate: F_mag=%.1f, ratio preserved — PASS\n", F_mag);
 }
@@ -119,21 +125,24 @@ void test_combined_slip() {
 
     // Pure longitudinal
     tyre.forces(0.05, 0.0, Fz, Fx, Fy);
-    assert(std::abs(Fy) < kTol);
-    assert(Fx > 0.0);
+    // 1e-3: alpha=0 gives exactly zero lateral force; floor-1 scale makes this an absolute check
+    ASSERT_REL_NEAR(Fy, 0.0, kTol);
+    ASSERT_CHECK(Fx > 0.0, "longitudinal force is positive for positive longitudinal slip");
     printf("  combined (pure long): Fx=%.1f, Fy=%.3f\n", Fx, Fy);
 
     // Pure lateral
     tyre.forces(0.0, 0.05, Fz, Fx, Fy);
-    assert(std::abs(Fx) < kTol);
-    assert(Fy > 0.0);
+    // 1e-3: kappa=0 gives exactly zero longitudinal force; floor-1 scale makes this an absolute check
+    ASSERT_REL_NEAR(Fx, 0.0, kTol);
+    ASSERT_CHECK(Fy > 0.0, "lateral force is positive for positive lateral slip");
     printf("  combined (pure lat):  Fx=%.3f, Fy=%.1f\n", Fx, Fy);
 
     // Combined — both non-zero, magnitude <= mu*Fz
     tyre.forces(0.05, 0.05, Fz, Fx, Fy);
     double F_mag = std::sqrt(Fx * Fx + Fy * Fy);
-    assert(F_mag <= 0.9 * Fz + kTol);
-    assert(Fx > 0.0 && Fy > 0.0);
+    // kTol guards the floating-point boundary at exactly F_max; this is a magnitude bound, not a near-equality
+    ASSERT_CHECK(F_mag <= 0.9 * Fz + kTol, "combined force magnitude stays within the traction circle (1e-3 N float guard at boundary)");
+    ASSERT_CHECK(Fx > 0.0 && Fy > 0.0, "both force components are positive for positive slip inputs");
     printf("  combined (both): Fx=%.1f, Fy=%.1f, |F|=%.1f — PASS\n", Fx, Fy, F_mag);
 }
 
@@ -153,7 +162,8 @@ void test_force_slip_curve_initial_slope() {
 
     // Should be within 5% (approximation valid only at very small slip)
     double error = std::abs(slope - expected_slope) / expected_slope;
-    assert(error < 0.05);
+    // 5%: B*C*D is the exact initial slope; at slip=0.001 the small-angle approximation holds to <1%
+    ASSERT_CHECK(error < 0.05, "initial slope is within 5% of B*C*D (small-angle approximation at slip=0.001)");
 
     printf("  initial slope: %.0f vs expected %.0f (error %.1f%%) — PASS\n",
            slope, expected_slope, error * 100.0);
