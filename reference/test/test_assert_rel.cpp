@@ -54,6 +54,11 @@ static void test_matrix_falls_back_to_absolute_when_small() {
     std::printf("  [PASS] matrix: fallback to absolute scale for tiny matrices\n");
 }
 
+static void test_check_passes_on_true() {
+    ASSERT_CHECK(1.0 < 2.0, "strict inequality holds");
+    std::printf("  [PASS] check: true condition passes\n");
+}
+
 int main() {
     std::printf("assert_rel helper tests:\n");
     test_scalar_exact_match();
@@ -63,6 +68,7 @@ int main() {
     test_matrix_within_tolerance();
     test_matrix_zero_matrices();
     test_matrix_falls_back_to_absolute_when_small();
+    test_check_passes_on_true();
     std::printf("All assert_rel tests passed.\n");
     return 0;
 }
