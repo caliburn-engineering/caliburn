@@ -70,9 +70,10 @@ void test_eigenvalues_stable() {
 // Test 3: Analytical natural frequencies (undamped case)
 // ---------------------------------------------------------------------------
 void test_natural_frequencies() {
-    // For equal masses and springs with no damping:
-    // m1 = m2 = m, k1 = k2 = k, c1 = c2 = 0
-    // Natural frequencies: omega_1 = sqrt(k/m), omega_2 = sqrt(3k/m)
+    // Wall -- k1 -- m1 -- k2 -- m2 (free end), no damping, m = 1, k = 10:
+    //   K = [[k1+k2, -k2], [-k2, k2]] = [[20, -10], [-10, 10]], M = I
+    //   det(K - w^2 I) = 0  =>  w^4 - 30 w^2 + 100 = 0  =>  w^2 = 15 -/+ sqrt(125)
+    //   omega_1 = 1.9544 rad/s, omega_2 = 5.1167 rad/s
     caliburn::DoubleMassSpringDamperParams p;
     p.m1 = 1.0; p.m2 = 1.0;
     p.k1 = 10.0; p.k2 = 10.0;
@@ -91,10 +92,11 @@ void test_natural_frequencies() {
     // Sort frequencies
     std::sort(freqs, freqs + 4);
 
-    // Expected: omega_1 = sqrt(k/m) = sqrt(10), omega_2 = sqrt(3k/m) = sqrt(30)
-    // Each appears twice (conjugate pairs)
-    double omega_1 = std::sqrt(10.0);
-    double omega_2 = std::sqrt(30.0);
+    // Each frequency appears twice (conjugate pairs).
+    // tol 1e-8: a 4x4 nonsymmetric eigensolve with O(10) entries is accurate to
+    // ~1e-14 for these well-separated, non-defective eigenvalues.
+    double omega_1 = std::sqrt(15.0 - std::sqrt(125.0));
+    double omega_2 = std::sqrt(15.0 + std::sqrt(125.0));
     double tol = 1e-8;
 
     assert(std::abs(freqs[0] - omega_1) < tol);
