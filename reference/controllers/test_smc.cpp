@@ -125,10 +125,12 @@ void test_super_twisting() {
     // Check convergence
     double final_pos = std::abs(res.position.back());
     double final_vel = std::abs(res.velocity.back());
-    // TODO(#75): tolerance unjustified — measured |pos| = 6.4e-5 (Release), so 0.1 is ~1500x
-    // looser than the observed error; the velocity bound was not separately derived.
-    ASSERT_CHECK(final_pos < 0.1, "Super-twisting should converge");
-    ASSERT_CHECK(final_vel < 0.1, "Super-twisting velocity should converge");
+    // Finite-time convergence to σ=0 is conservative at t_r ≤ 0.5s (σ_0=2.5, k1=10, d=2:
+    // σ̇ ≈ −k1√σ + d ≈ −13.8 initially, so t_r ≈ 0.2s); on the sliding surface v = −λx,
+    // so x decays as e^{−2t}. With t_r ≤ 0.5s and x_r ≤ 1.25: |x| ≤ 1.25·e^{−2·4.5} ≈ 1.5e-4.
+    // On surface |v| = 2·|x|, same bound. 5e-4 adds ~3× safety.
+    ASSERT_CHECK(final_pos < 5e-4, "Super-twisting should converge");
+    ASSERT_CHECK(final_vel < 5e-4, "Super-twisting velocity should converge");
 
     // Check control continuity: max |u[i] - u[i-1]| should be small
     double max_jump = 0.0;

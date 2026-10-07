@@ -114,10 +114,13 @@ void test_riccati_residual() {
                              - P * B * Rinv_Bt * P + Q;
 
     double residual_norm = residual.norm();
-    // TODO(#75): tolerance unjustified — 1e-6 is ~1e7× larger than the ~1e-13 rounding
-    // expected from the 4×4 Hamiltonian eigendecomposition (unit Q, R); this is a
-    // sanity bound only, not a precision guarantee.
-    ASSERT_CHECK(residual_norm < 1e-6, "lqr: Riccati equation residual too large");
+    // Closed form for this plant: P = [[√3, 1], [1, √3]], so |P| entries ≤ √3.
+    // The 4×4 Hamiltonian H has ‖H‖_F = √6. A backward-stable eigensolver perturbs it by
+    // ≈ n·u·‖H‖_F ≈ 4·1.1e-16·2.45 ≈ 1e-15, and the stable-subspace basis X1 (κ(X1) = 2+√3 ≈ 3.7)
+    // carries that into P: |δP| ≈ 4e-15. The residual's sensitivity to P is
+    // ‖Aᵀ‖ + ‖A‖ + 2‖P B R⁻¹ Bᵀ‖ ≈ 1 + 1 + 2·2 ≈ 6, giving ≈ 2.4e-14. Forming the residual
+    // (products of O(√3) entries) adds a few u·‖P‖² ≈ 1e-15. 1e-12 is ~40× over the sum.
+    ASSERT_CHECK(residual_norm < 1e-12, "lqr: Riccati equation residual too large");
 
     std::cout << "  [PASS] Test 3: Riccati equation residual = "
               << residual_norm << "\n";
