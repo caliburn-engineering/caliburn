@@ -78,8 +78,14 @@ void test_mass_spring_damper() {
     // After 5 seconds with poles at -20,-25, error should be negligible
     double err = obs.errorNorm(x_true);
     printf("Test 1 (mass-spring-damper): final error = %.6e\n", err);
-    // 1e-3: measured err = 4.6e-4 (Release), only ~2x margin. Not the e^{-100} a pure pole-decay
-    // estimate suggests, so a small change to this test or observer can tip it over.
+    // 1e-3 is not a pole-decay bound and cannot be tightened. The loop measures y = C·x_{k+1}
+    // (after the true state steps) while the observer still holds x̂_k, so x̂_k = x_{k+1} is an
+    // exact invariant of the observer recursion: substituting gives innovation 0 and
+    // x̂_{k+1} = x_{k+1} + dt·A·x_{k+1} = x_{k+2}. The observer converges (poles -20, -25, so
+    // the initial error is gone by e^{-100}) onto the state one step AHEAD, and the final error
+    // is ‖x_N - x_{N+1}‖ = dt·‖A·x(T)‖ = 1e-3·0.4629 ≈ 4.63e-4. That is an O(dt) offset set by
+    // the true state's derivative at T = 5 s, deterministic for this test. 1e-3 leaves ~2.2×.
+    // A change to dt, the horizon or the measurement timing moves it directly.
     ASSERT_CHECK(err < 1e-3, "observer should converge for mass-spring-damper");
     printf("  PASSED\n");
 }
@@ -226,11 +232,17 @@ void test_separation_principle() {
 
     printf("Test 3 (separation principle): true state norm = %.6e, "
            "observer error = %.6e\n", state_err, obs_err);
-    // TODO(#75): tolerance unjustified — measured state_err = 3.9e-8 (Release), so 1e-3 is
-    // ~1e4x looser than achieved.
-    ASSERT_CHECK(state_err < 1e-3, "true state should converge to origin");
-    // TODO(#75): tolerance unjustified — measured obs_err is exactly 0 (Release).
-    ASSERT_CHECK(obs_err < 1e-4, "observer should track true state");
+    // [x; e] evolves exactly linearly: x_{k+1} = (I + dt(A-BK))x_k + dt·BK·e_k and, because y is
+    // measured before the step, e_{k+1} = (I + dt(A-LC))e_k. The 4×4 step matrix has eigenvalues
+    // 0.998, 0.997, 0.99, 0.985 and eigenvector condition number κ = 112.6, so
+    // ‖x(T)‖ ≤ κ·‖[x0; e0]‖·0.998^10000 = 112.6·2.83·2.0e-9 ≈ 6.4e-7. 1e-6 is ~1.6× over.
+    ASSERT_CHECK(state_err < 1e-6, "true state should converge to origin");
+    // The exact observer error is 0.99^10000-scale (≈ 1e-42), far below round-off. What
+    // remains is the difference in rounding between the x and x̂ updates: ≤ ~2u·‖x‖ per step,
+    // contracting at 0.99 against x's 0.998, so ≲ 2u/(1 - 0.99/0.998) ≈ 250u ≈ 2.8e-14 of
+    // ‖x‖. Once x̂ and x coincide bitwise the innovation is exactly 0 and they stay
+    // identical, which is why Release measures exactly 0. 1e-12·‖x‖ is ~36× over the floor.
+    ASSERT_CHECK(obs_err <= 1e-12 * state_err, "observer should track true state to round-off");
     printf("  PASSED\n");
 }
 
