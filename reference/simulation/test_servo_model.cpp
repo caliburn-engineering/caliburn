@@ -101,6 +101,11 @@ static void test_dead_zone() {
     // Command outside dead zone
     servo.step(0.1, 0.01);
     ASSERT_CHECK(servo.angular_velocity() > 0.0, "velocity positive outside dead zone");
+    // error = K·θ_cmd - θ = 1·0.1 - 0 = 0.1; effective = 0.1 - dead_zone = 0.08;
+    // ω = 0.08 / τ = 0.08 / 0.1 = 0.8.  Mutation (+= dead_zone) gives ω = 1.2.
+    // 1e-15: 0.1, 0.02 and τ = 0.1 are not exact in binary (≤ u relative each), and the
+    // subtraction and division each round once (≤ u), so |ω - 0.8| ≤ ~5u·0.8 ≈ 4.4e-16.
+    ASSERT_REL_NEAR(servo.angular_velocity(), 0.8, 1e-15);
     std::printf("  [PASS] Dead zone\n");
 }
 

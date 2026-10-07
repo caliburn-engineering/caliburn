@@ -90,7 +90,30 @@ static void test_rolling_friction() {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Boundary detection
+// 5. Rolling y-friction decelerates
+// ---------------------------------------------------------------------------
+static void test_rolling_friction_y() {
+    BallParams ball{0.02, 0.05, 0.005};  // C_rr = 0.005
+    PlateParams plate{0.15, G};
+    RollingBallDynamics dyn(ball, plate);
+
+    // Ball rolling on level plate with positive y-velocity; x-velocity zero.
+    Eigen::Vector4d state(0.0, 0.0, 0.0, 1.0);
+    auto d = dyn.derivatives(state, 0.0, 0.0);
+
+    // ay = rf·(grav_y - fric_y) = (5/7)·(0 - C_rr·g) < 0.
+    // Mutation grav_y + fric_y gives ay > 0, failing the first check.
+    ASSERT_CHECK(d(3) < 0.0, "rolling y-friction must decelerate the ball");
+    double expected = -(5.0 / 7.0) * 0.005 * G;
+    // 1e-15: test and implementation evaluate the same product in a different order, so
+    // each side carries a few roundings (≤ ~4u relative); |ay| ≈ 0.035, so the difference
+    // is ≤ 2·4u·0.035 ≈ 3e-17, and ASSERT_REL_NEAR's floor of 1 makes 1e-15 absolute.
+    ASSERT_REL_NEAR(d(3), expected, 1e-15);
+    std::printf("  [PASS] Rolling y-friction decelerates (ay=%.6f)\n", d(3));
+}
+
+// ---------------------------------------------------------------------------
+// 6. Boundary detection
 // ---------------------------------------------------------------------------
 static void test_on_plate() {
     auto dyn = make_default();
@@ -108,7 +131,7 @@ static void test_on_plate() {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Integration test: ball accelerates under tilt
+// 7. Integration test: ball accelerates under tilt
 // ---------------------------------------------------------------------------
 static void test_integration() {
     auto dyn = make_default();
@@ -142,6 +165,7 @@ int main() {
     test_rolling_factor();
     test_both_axes();
     test_rolling_friction();
+    test_rolling_friction_y();
     test_on_plate();
     test_integration();
 
