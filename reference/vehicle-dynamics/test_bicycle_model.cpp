@@ -6,9 +6,9 @@
 
 using namespace caliburn;
 
-// TODO(#75): tolerance unjustified — its one use (steady-state yaw rate) evaluates the same
-// closed form on both sides and measures a difference of exactly 0 in Release.
-static constexpr double kTol = 1e-4;
+// 0: its one use (steady-state yaw rate) evaluates V·delta/(L + K_us·V·V) with the same
+// operands in the same order as the implementation, so both sides round identically.
+static constexpr double kTol = 0.0;
 
 static VehicleParams default_car() {
     return VehicleParams{
@@ -77,9 +77,12 @@ void test_simulation_converges_to_steady_state() {
     double r_ss = model.steady_state_yaw_rate(delta, V);
 
     double error = std::abs(r_sim - r_ss);
-    // TODO(#75): tolerance unjustified — measured error is 2.6e-13 (Release), so 1e-3 is
-    // ~1e9x looser than the RK4 settling error actually reached.
-    ASSERT_CHECK(error < 0.001, "RK4 simulation converges to steady-state yaw rate within 0.001 rad/s after 5 s");
+    // The error is the decaying transient, not round-off. At V = 20 the lateral/yaw modes
+    // are -5.387 ± 2.495j and A is diagonalisable with κ(V) = 7.80, so from x0 = 0:
+    // |r - r_ss| ≤ ‖x - x_ss‖ ≤ κ(V)·‖x_ss‖·e^{-5.387·5} = 7.80·0.2885·e^{-26.93} ≈ 4.5e-12.
+    // RK4 at h·|λ| ≈ 0.006 tracks e^{hλ} to O((hλ)^5) per step; round-off is ~1e-16 per step,
+    // contracted. 1e-11 is ~2× over the bound.
+    ASSERT_CHECK(error < 1e-11, "RK4 simulation converges to steady-state yaw rate within 1e-11 rad/s after 5 s");
     printf("  simulation converges to r_ss: error = %.6f — PASS\n", error);
 }
 
