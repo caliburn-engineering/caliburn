@@ -10,6 +10,7 @@ struct PidGains {
 
 class PidController {
 public:
+    // Throws std::invalid_argument if output_min > output_max.
     PidController(const PidGains& gains, double output_min, double output_max);
 
     double compute(double setpoint, double measurement, double dt);

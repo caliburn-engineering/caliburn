@@ -55,15 +55,23 @@ Integral windup occurs when the controller output saturates (e.g., servo angle l
 
 ### 1. Clamping (Integral Limits)
 
-Compute integral bounds from the output range and integral gain:
+Compute integral bounds from the output range and integral gain. The bounds must
+be **ordered** with `std::minmax` so that negative `Ki` values (valid for
+reverse-acting loops) do not produce `lo > hi` and undefined behaviour in
+`std::clamp`:
 
 ```cpp
-integral_min_ = output_min_ / gains_.Ki;
-integral_max_ = output_max_ / gains_.Ki;
-
-// After integration step:
-integral_ = std::clamp(integral_, integral_min_, integral_max_);
+auto [lo, hi] = std::minmax(output_min_ / gains_.Ki, output_max_ / gains_.Ki);
+integral_ = std::clamp(integral_, lo, hi);
 ```
+
+This keeps `Ki * integral` within `[output_min, output_max]` for either sign of
+`Ki`. When `Ki == 0` the integral clamp is skipped entirely.
+
+Negative gains (`Kp`, `Ki`, `Kd`) are supported — a reverse-acting loop on a
+negative-gain plant uses negative gains. The constructor rejects inverted limits
+(`output_min > output_max`) with `std::invalid_argument`; `output_min ==
+output_max` is allowed.
 
 ### 2. Back-Calculation
 
