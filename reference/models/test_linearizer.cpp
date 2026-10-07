@@ -82,12 +82,14 @@ static void test_ball_balancer_linearization() {
     auto result = validate(analytical, f, x0, u0, 1e-6);
 
     ASSERT_CHECK(result.pass, "ball-balancer validation must pass");
-    // TODO(#75): tolerance unjustified — A is linear in the state, so central differences are
-    // exact up to round-off; measured max_A_error = 0 (Release).
-    ASSERT_CHECK(result.max_A_error < 1e-8, "max A error must be < 1e-8");
-    // TODO(#75): tolerance unjustified — sin linearization at u0=0 via central diff;
-    // measured max_B_error = 1.2e-12 (Release), so 1e-6 is ~1e6x looser than achieved.
-    ASSERT_CHECK(result.max_B_error < 1e-6, "max B error must be < 1e-6 (sin linearization via central diff)");
+    // A: f is linear in the state and x0 = 0, so x0 ± h are exactly ±h, f(x0 ± h) are exactly
+    // ±h (or 0 for rows that depend only on u), and (f+ - f-)/(2h) is exactly 1 or 0. The
+    // central difference is exact, so the error must be exactly 0.
+    ASSERT_CHECK(result.max_A_error == 0.0, "max A error must be exactly 0 (linear f at x0 = 0: central diff exact)");
+    // B: sin linearisation at u0=0 via central diff with epsilon=1e-6. Truncation dominates:
+    // K*G * (1 - sin(h)/h) = K*G*h^2/6 = 0.714*9.81*(1e-6)^2/6 = 1.17e-12; measured 1.17e-12.
+    // Use 1e-11 (10x margin).
+    ASSERT_CHECK(result.max_B_error < 1e-11, "max B error must be < 1e-11 (sin via central diff, K*G*h^2/6)");
 
     std::printf("  [PASS] Ball-balancer analytical vs numerical (max_A=%.2e, max_B=%.2e)\n",
                 result.max_A_error, result.max_B_error);
@@ -139,9 +141,12 @@ static void test_nonzero_operating_point() {
     auto sys = linearize(f, x0, u0);
 
     // A(0,0) = -4.0 — magnitude > 1, so ASSERT_REL_NEAR would be looser.
-    // TODO(#75): tolerance unjustified — central diff of -x² is exact up to round-off
-    // (~eps/h); measured error 1.2e-10 (Release), so 1e-6 is ~1e4x looser.
-    ASSERT_CHECK(std::abs(sys.A(0, 0) - (-4.0)) < 1e-6, "A(0,0) = df/dx = -2*x0 = -4");
+    // Central diff of -x² has no truncation error (third derivative is 0), so the error is
+    // pure round-off. h = 1e-6, u = 2^-53 ≈ 1.1e-16. Rounding x0 ± h to a double moves each
+    // point by ≤ u·2, which moves f by ≤ 4·2.2e-16 = 8.8e-16; each square (≈ 4) rounds by
+    // ≤ u·4 = 4.4e-16; the subtraction from u0 = 4 is exact (Sterbenz). Numerator error
+    // ≤ 2·(8.8 + 4.4)e-16 ≈ 2.6e-15, divided by 2h: ≤ 1.3e-9. 1e-8 is ~7.5× over.
+    ASSERT_CHECK(std::abs(sys.A(0, 0) - (-4.0)) < 1e-8, "A(0,0) = df/dx = -2*x0 = -4");
     ASSERT_REL_NEAR(sys.B(0, 0), 1.0, TOL);  // expected 1; scale = 1
 
     std::printf("  [PASS] Nonzero operating point (A=%.4f, B=%.4f)\n",

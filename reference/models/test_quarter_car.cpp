@@ -2,6 +2,7 @@
 #include "../integrators/rk4.h"
 #include "../test/assert_rel.h"
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <complex>
 
@@ -79,15 +80,18 @@ void test_bump_response() {
     Eigen::Vector4d x_ss = -model.A.inverse() * model.B_w * bump_height;
 
     double err = (x_final - x_ss).norm();
-    // TODO(#75): tolerance unjustified — measured err = 2.6e-10 (Release), so 0.01 is ~1e7x
-    // looser than the observed settling error.
-    ASSERT_CHECK(err < 0.01, "bump response did not settle to steady state");
+    // Transient decay: A is diagonalisable, so ‖e^{At}‖ ≤ κ(V)·e^{σ t} with σ = -2.116 rad/s
+    // (the slower, body-bounce pair -2.116 ± 7.61j) and κ(V) = 80.5 for the default parameters.
+    // From x0 = 0: err ≤ κ(V)·|x_ss|·e^{σ·10} = 80.5·0.0707·e^{-21.16} ≈ 3.7e-9. RK4 at
+    // h·|λ|max ≈ 0.037 tracks e^{hλ} to O((hλ)^5) per step, negligible here.
+    // 1e-8 is ~2.7× over the bound.
+    ASSERT_CHECK(err < 1e-8, "bump response did not settle to steady state");
 
     // Steady-state body position should equal bump height (body rises to road level)
     // x_ss(0) = z_b should be approximately bump_height
-    // TODO(#75): tolerance unjustified — x_ss comes from a static 4x4 solve; measured
-    // error is 6.9e-18 (Release), so 0.001 is ~1e14x looser than achieved.
-    ASSERT_CHECK(std::abs(x_ss(0) - bump_height) < 0.001,
+    // Static 4x4 solve; the exact answer is bump_height. Forward error ≲ n·κ(A)·u·|x_ss|, with
+    // κ(A) = 5554 for the default parameters: 4·5554·1.1e-16·0.0707 ≈ 1.7e-16. 1e-14 is ~60× over.
+    ASSERT_CHECK(std::abs(x_ss(0) - bump_height) < 1e-14,
                  "steady-state body position does not match bump height");
 
     std::cout << "  [PASS] Test 3: Bump response settles correctly (err=" << err
@@ -122,11 +126,46 @@ void test_input_matrices() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 5: A matrix, every entry, against the equations of motion
+//   z_ddot_b = [-k_s(z_b - z_w) - c_s(z_dot_b - z_dot_w) + F_a] / m_b
+//   z_ddot_w = [ k_s(z_b - z_w) + c_s(z_dot_b - z_dot_w) - k_t(z_w - z_r) - F_a] / m_w
+// Each expected entry is the same single IEEE division (or sum then division) of the
+// parameters as the model must perform, so the comparison is exact (tolerance 0).
+// Default parameters are used: m_b ≠ m_w and k_s ≠ k_t, so a swapped mass or
+// stiffness changes the entry. This catches, for example, the damper coupling A(1,3)
+// dropped to 0, A(3,1) dropped, or a wheel-row entry divided by m_b.
+// ---------------------------------------------------------------------------
+void test_a_matrix_structure() {
+    caliburn::QuarterCarParams p;
+    auto model = caliburn::build_quarter_car(p);
+
+    Eigen::Matrix4d expected;
+    expected <<            0.0,             1.0,                       0.0,             0.0,
+               -p.k_s / p.m_b, -p.c_s / p.m_b,             p.k_s / p.m_b,   p.c_s / p.m_b,
+                           0.0,             0.0,                       0.0,             1.0,
+                p.k_s / p.m_w,  p.c_s / p.m_w, -(p.k_s + p.k_t) / p.m_w,  -p.c_s / p.m_w;
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            if (model.A(i, j) != expected(i, j)) {
+                std::fprintf(stderr, "A(%d,%d) = %.17g, expected %.17g\n", i, j,
+                             model.A(i, j), expected(i, j));
+            }
+            ASSERT_CHECK(model.A(i, j) == expected(i, j),
+                         "quarter-car A entry must match the equations of motion exactly");
+        }
+    }
+
+    std::cout << "  [PASS] Test 5: every A entry matches the equations of motion\n";
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     test_natural_frequencies();
     test_eigenvalues_stable();
     test_bump_response();
     test_input_matrices();
+    test_a_matrix_structure();
 
     std::cout << "\nAll quarter-car tests passed.\n";
     return 0;

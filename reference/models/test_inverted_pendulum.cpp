@@ -65,6 +65,16 @@ void test_matrix_structure() {
     ASSERT_REL_NEAR(model.B(1), 1.0 / p.M, tol);
     ASSERT_REL_NEAR(model.B(3), -1.0 / (p.M * p.L), tol);
 
+    // Verify B(1) with L ≠ 1 to distinguish m·L²/D = 1/M from mutation m·L/D = 1/(M·L).
+    // With M=2, m=0.5, L=2, g=9.81: D = m·L²·M = 0.5·4·2 = 4;
+    //   correct B(1) = m·L²/D = 2/4 = 1/M = 0.5;
+    //   mutation gives m·L/D = 1/4 = 0.25 ≠ 0.5.
+    caliburn::InvertedPendulumParams p2;
+    p2.M = 2.0; p2.m = 0.5; p2.L = 2.0; p2.g = 9.81;
+    auto model2 = caliburn::build_inverted_pendulum(p2);
+    ASSERT_REL_NEAR(model2.B(1), 1.0 / p2.M, tol);          // expected 0.5; scale = 1
+    ASSERT_REL_NEAR(model2.B(3), -1.0 / (p2.M * p2.L), tol); // expected -0.25; scale = 1
+
     std::cout << "  [PASS] Test 2: A matrix structure verified\n";
 }
 
